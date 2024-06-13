@@ -12,64 +12,59 @@ const isNilOrEmptyArray = el => {
   return R.isNil(el) || R.isEmpty(el);
 };
 
-//TODO: UPDATE with your own mapping
 const resolvers = {
   Query: {
-    id: R.path(['uuid']),
-    orderId: R.pathOr('', ['orderReference']),
-    bookingId: R.pathOr('', ['supplierReference']),
-    supplierBookingId: R.path(['supplierReference']),
+    id: R.path(['id']),
+    orderId: R.pathOr('', ['uuid']),
+    bookingId: R.pathOr('', ['id']),
+    // not defined in schema?
+    // bookingPartnerId: R.path(['bookingPartnerId']),
+    supplierBookingId: R.path(['bookingRefID']),
     status: e => capitalize(R.path(['status'], e)),
-    productId: R.path(['product', 'productId']),
-    productName: R.path(['product', 'productName']),
+    productId: R.path(['product', 'id']),
+    productName: R.path(['product', 'internalName']),
     cancellable: root => {
       if (root.status === 'CANCELED') return false;
       return root.cancellable;
     },
     editable: () => false,
     unitItems: ({ unitItems = [] }) => unitItems.map(unitItem => ({
-      unitItemId: R.path(['uuid'], unitItem),
-      unitId: R.path(['unitId'], unitItem),
-      unitName: R.pathOr('', ['unit', 'title'], unitItem),
+      unitItemId: R.path(['unitId'], unitItem),
+      unitName: R.path(['unitId'], unitItem),
+      // Here we have to show noOfPax!
+      unitId: R.path(['noOfPax'], unitItem),
     })),
-    start: R.path(['availability', 'localDateTimeStart']),
-    end: R.path(['availability', 'localDateTimeEnd']),
-    allDay: R.path(['availability', 'allDay']),
-    bookingDate: R.path(['utcConfirmedAt']),
+    // start: R.path(['availability', 'localDateTimeStart']),
+    start: R.path(['utcCreatedAt']),
+    end: R.path(['utcCreatedAt']),
+    // end: R.path(['availability', 'localDateTimeStart']),
+    // allDay: false,
+    bookingDate: R.path(['utcCreatedAt']),
     holder: root => ({
-      name: R.path(['contact', 'firstName'], root),
-      surname: R.path(['contact', 'lastName'], root),
-      fullName: R.path(['contact', 'fullName'], root),
-      phoneNumber: R.path(['contact', 'phoneNumber'], root),
-      emailAddress: R.path(['contact', 'emailAddress'], root),
+      name: R.pathOr('', ['travelerFirstname'], root),
+      surname: R.pathOr('', ['travelerLastname'], root),
+      fullName: R.pathOr('', ['travelerFirstname'], root) + " " + R.pathOr('', ['travelerLastname'], root),
+      phoneNumber: R.pathOr('', ['phone'], root),
+      emailAddress: R.pathOr('', ['email'], root),
     }),
-    notes: R.pathOr('', ['notes']),
+    // notes: R.pathOr('', ['notes']),
     price: root => ({
-      original: R.path(['pricing', 'original'], root),
-      retail: R.path(['pricing', 'retail'], root),
-      currencyPrecision: R.path(['pricing', 'currencyPrecision'], root),
-      currency: R.path(['pricing', 'currency'], root),
+      //original: R.path(['pricing', 'original'], root),
+      retail:R.pathOr('', ['totalNet'], root),
+      // currencyPrecision: 2,
+      currency: "AUD", //R.path(['pricing', 'currency'], root),
     }),
     cancelPolicy: root => {
-      const cancellationCutoff = R.pathOr('', ['option', 'cancellationCutoff'], root);
+      const cancellationCutoff = R.pathOr('', ['product', 'options', 'cancellationCutoff'], root);
       if (cancellationCutoff) return `Cancel before ${cancellationCutoff} of departure time.`;
       return '';
     },
-    optionId: R.path(['optionId']),
-    optionName: ({ option }) => option ? option.internalName : '',
-    resellerReference: R.propOr('', 'resellerReference'),
-    // TODO
-    publicUrl: R.prop('confirmation_url'),
-    privateUrl: R.prop('dashboard_url'),
-    pickupRequested: R.prop('pickupRequested'),
-    pickupPointId: R.prop('pickupPointId'),
-    pickupPoint: root => {
-      const pickupPoint = R.path(['pickupPoint'], root);
-      if (!pickupPoint) return null;
-      return {
-        ...pickupPoint,
-        postal: pickupPoint.postal_code,
-      };
+    // optionId: R.path(['optionId']),
+    // optionName: ({ option }) => option ? option.internalName : '',
+    // resellerReference: R.propOr('', 'id'),
+    privateUrl: root => {
+      // return `https://bmsstage.bonzabiketours.com/purchases/edit-tour/57411`
+      return `https://bmsstage.bonzabiketours.com/purchases/edit-tour/${root.id}`
     },
   },
 };

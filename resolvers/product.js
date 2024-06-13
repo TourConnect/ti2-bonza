@@ -2,7 +2,6 @@ const { makeExecutableSchema } = require('@graphql-tools/schema');
 const R = require('ramda');
 const { graphql } = require('graphql');
 
-//TODO: UPDATE with your own mapping
 const resolvers = {
   Query: {
     productId: R.path(['id']),
@@ -11,7 +10,7 @@ const resolvers = {
       const result = R.propOr([], 'availableCurrencies', root);
       return R.uniq(result);
     },
-    defaultCurrency: R.path(['defaultCurrency']),
+    // defaultCurrency: R.path(['defaultCurrency']),
     options: R.propOr([], 'options'),
   },
   Option: {
@@ -22,15 +21,23 @@ const resolvers = {
   Unit: {
     unitId: R.path(['id']),
     unitName: R.pathOr('', ['internalName']),
-    subtitle: R.pathOr('', ['note']),
+    // subtitle: R.pathOr('', ['note']),
     type: R.prop('type'),
-    pricing: root => R.propOr([], 'pricingFrom', root).map(p => ({
-      original: R.path(['subtotal'], p),
-      retail: R.path(['subtotal'], p),
-      currencyPrecision: R.path(['currencyPrecision'], p),
-      currency: R.path(['currency'], p),
-    })),
-    restrictions: R.propOr({}, 'restrictions'),
+    pricing: R.path('pricePerUnit'),
+    restrictions: root => {
+      if (!root.restrictions) return {};
+      if (root.restrictions.minAge === 0 && root.restrictions.maxAge === 99) {
+        if (root.reference && extractAndSortNumbers(root.reference)) {
+          const [minAge, maxAge] = extractAndSortNumbers(root.reference);
+          return {
+            ...root.restrictions,
+            minAge: minAge || 0,
+            maxAge: maxAge || 99,
+          }
+        }
+      }
+      return {};
+    },
   },
 };
 
