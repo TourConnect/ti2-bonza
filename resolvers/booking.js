@@ -28,11 +28,15 @@ const resolvers = {
       return root.cancellable;
     },
     editable: () => false,
+    // TODO: need to have inidividual items in the array
+    // if ADULT = 2 and CHILD = 3, then it hsould ahve 2 items for ADULT in the array
+    // and 3 items for the CHILD in the array
     unitItems: ({ unitItems = [] }) => unitItems.map(unitItem => ({
+      // TODO:  unitItemId create one here and NEEDS to be unique
       unitItemId: R.path(['unitId'], unitItem),
       unitName: R.path(['unitId'], unitItem),
       // Here we have to show noOfPax!
-      unitId: R.path(['noOfPax'], unitItem),
+      unitId: R.path(['unitId'], unitItem),
     })),
     // start: R.path(['availability', 'localDateTimeStart']),
     start: R.path(['utcCreatedAt']),
@@ -50,8 +54,8 @@ const resolvers = {
     // notes: R.pathOr('', ['notes']),
     price: root => ({
       //original: R.path(['pricing', 'original'], root),
-      retail:R.pathOr('', ['totalNet'], root),
-      // currencyPrecision: 2,
+      retail: (R.pathOr('', ['totalNet'], root)) * 100,
+      currencyPrecision: 2,
       currency: "AUD", //R.path(['pricing', 'currency'], root),
     }),
     cancelPolicy: root => {
@@ -63,7 +67,6 @@ const resolvers = {
     // optionName: ({ option }) => option ? option.internalName : '',
     // resellerReference: R.propOr('', 'id'),
     privateUrl: root => {
-      // return `https://bmsstage.bonzabiketours.com/purchases/edit-tour/57411`
       return `https://bmsstage.bonzabiketours.com/purchases/edit-tour/${root.id}`
     },
   },

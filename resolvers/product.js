@@ -10,34 +10,170 @@ const resolvers = {
       const result = R.propOr([], 'availableCurrencies', root);
       return R.uniq(result);
     },
-    // defaultCurrency: R.path(['defaultCurrency']),
-    options: R.propOr([], 'options'),
-  },
-  Option: {
-    optionId: R.prop('id'),
-    optionName: R.prop('internalName'),
-    units: R.propOr([], ['units']),
-  },
-  Unit: {
-    unitId: R.path(['id']),
-    unitName: R.pathOr('', ['internalName']),
-    // subtitle: R.pathOr('', ['note']),
-    type: R.prop('type'),
-    pricing: R.path('pricePerUnit'),
-    restrictions: root => {
-      if (!root.restrictions) return {};
-      if (root.restrictions.minAge === 0 && root.restrictions.maxAge === 99) {
-        if (root.reference && extractAndSortNumbers(root.reference)) {
-          const [minAge, maxAge] = extractAndSortNumbers(root.reference);
-          return {
-            ...root.restrictions,
-            minAge: minAge || 0,
-            maxAge: maxAge || 99,
-          }
-        }
-      }
-      return {};
-    },
+    //defaultCurrency: 'AUD', //R.path(['defaultCurrency']),
+
+    options: root => [
+      {
+        optionId: "1",
+        optionName: 'Non-Family',
+        // cancellationCutoff: R.pathOr('', ['cancellationCutoff'], root),
+        units: root => [
+          {
+            unitId: "ADULT",
+            unitName: "Adult",
+            // subtitle: R.pathOr('', ['note']),
+            type: R.path('', 'type', root),
+            pricing: R.path('pricePerUnit'),
+            restrictions: root => {
+              if (!root.restrictions) return {};
+              if (root.restrictions.minAge === 0 && root.restrictions.maxAge === 99) {
+                if (root.reference && extractAndSortNumbers(root.reference)) {
+                  const [minAge, maxAge] = extractAndSortNumbers(root.reference);
+                  return {
+                    // ...root.restrictions,
+                    minAge: minAge || 0,
+                    maxAge: maxAge || 99,
+                  }
+                }
+              }
+              return {};
+            },
+          },
+          {
+            unitId: "CHILD",
+            unitName: "Child",
+            // subtitle: R.pathOr('', ['note']),
+            type: R.prop('type'),
+            pricing: R.path('pricePerUnit'),
+            restrictions: root => {
+              if (!root.restrictions) return {};
+              if (root.restrictions.minAge === 0 && root.restrictions.maxAge === 99) {
+                if (root.reference && extractAndSortNumbers(root.reference)) {
+                  const [minAge, maxAge] = extractAndSortNumbers(root.reference);
+                  return {
+                    // ...root.restrictions,
+                    minAge: minAge || 0,
+                    maxAge: maxAge || 99,
+                  }
+                }
+              }
+              return {};
+            },
+          },
+          {
+            unitId: "INFANT",
+            unitName: "Infant",
+            // subtitle: R.pathOr('', ['note']),
+            type: R.prop('type'),
+            pricing: R.path('pricePerUnit'),
+            restrictions: root => {
+              if (!root.restrictions) return {};
+              if (root.restrictions.minAge === 0 && root.restrictions.maxAge === 99) {
+                if (root.reference && extractAndSortNumbers(root.reference)) {
+                  const [minAge, maxAge] = extractAndSortNumbers(root.reference);
+                  return {
+                    // ...root.restrictions,
+                    minAge: minAge || 0,
+                    maxAge: maxAge || 99,
+                  }
+                }
+              }
+              return {};
+            },
+          },
+        ]
+      },
+      {
+        optionId: "2",
+        optionName: 'Family',
+        units: root => [
+          {
+            unitId: "FAMILY_GROUPS",
+            unitName: "Family Groups",
+            // subtitle: R.pathOr('', ['note']),
+            type: R.prop('type'),
+            pricing: R.path('pricePerUnit'),
+            restrictions: root => {
+              if (!root.restrictions) return {};
+              if (root.restrictions.minAge === 0 && root.restrictions.maxAge === 99) {
+                if (root.reference && extractAndSortNumbers(root.reference)) {
+                  const [minAge, maxAge] = extractAndSortNumbers(root.reference);
+                  return {
+                    //// ...root.restrictions,
+                    minAge: minAge || 0,
+                    maxAge: maxAge || 99,
+                  }
+                }
+              }
+              return {};
+            },
+          },
+          {
+            unitId: "ADD_ADULT",
+            unitName: "Additional Adult",
+            // subtitle: R.pathOr('', ['note']),
+            type: R.prop('type'),
+            pricing: R.path('pricePerUnit'),
+            restrictions: root => {
+              if (!root.restrictions) return {};
+              if (root.restrictions.minAge === 0 && root.restrictions.maxAge === 99) {
+                if (root.reference && extractAndSortNumbers(root.reference)) {
+                  const [minAge, maxAge] = extractAndSortNumbers(root.reference);
+                  return {
+                    //// ...root.restrictions,
+                    minAge: minAge || 0,
+                    maxAge: maxAge || 99,
+                  }
+                }
+              }
+              return {};
+            },
+          },
+          {
+            unitId: "ADD_CHILD",
+            unitName: "Additional Child",
+            // subtitle: R.pathOr('', ['note']),
+            type: R.prop('type'),
+            pricing: R.path('pricePerUnit'),
+            restrictions: root => {
+              if (!root.restrictions) return {};
+              if (root.restrictions.minAge === 0 && root.restrictions.maxAge === 99) {
+                if (root.reference && extractAndSortNumbers(root.reference)) {
+                  const [minAge, maxAge] = extractAndSortNumbers(root.reference);
+                  return {
+                    // ...root.restrictions,
+                    minAge: minAge || 0,
+                    maxAge: maxAge || 99,
+                  }
+                }
+              }
+              return {};
+            },
+          },
+          {
+            unitId: "FAMILY_INFANT",
+            unitName: "Infant",
+            // subtitle: R.pathOr('', ['note']),
+            type: R.prop('type'),
+            pricing: R.path('pricePerUnit'),
+            restrictions: root => {
+              if (!root.restrictions) return {};
+              if (root.restrictions.minAge === 0 && root.restrictions.maxAge === 99) {
+                if (root.reference && extractAndSortNumbers(root.reference)) {
+                  const [minAge, maxAge] = extractAndSortNumbers(root.reference);
+                  return {
+                    // ...root.restrictions,
+                    minAge: minAge || 0,
+                    maxAge: maxAge || 99,
+                  }
+                }
+              }
+              return {};
+            },
+          },
+        ]
+      },
+    ]
   },
 };
 
@@ -50,6 +186,7 @@ const translateProduct = async ({
     typeDefs,
     resolvers,
   });
+
   const retVal = await graphql({
     schema,
     rootValue,

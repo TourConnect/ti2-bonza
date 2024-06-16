@@ -301,7 +301,9 @@ class Plugin {
       holder,
       notes,
       reference,
+      customFieldValues
       // settlementMethod,
+      // rebookingId : this is for Edit
     },
     token,
     typeDefsAndQueries,
@@ -314,6 +316,42 @@ class Plugin {
     assert(R.path(['name'], holder), 'a holder\' first name is required');
     assert(R.path(['surname'], holder), 'a holder\' surname is required');
     assert(R.path(['emailAddress'], holder), 'a holder\' email is required');
+
+    if (customFieldValues && customFieldValues.length) {
+
+    }
+
+    // const dataForCreateBooking = await jwt.verify(availabilityKey, this.jwtKey);
+    // if (customFieldValues && customFieldValues.length) {
+    //   const productCFV = customFieldValues.filter(o => !R.isNil(o.value) && !o.field.isPerUnitItem);
+    //   const unitItemCFV = customFieldValues.filter(o => !R.isNil(o.value) && o.field.isPerUnitItem);
+    //   if (productCFV.length) {
+    //     dataForCreateBooking.questionAnswers = productCFV.map(o => ({
+    //       questionId: o.field.id,
+    //       value: o.value,
+    //     }));
+    //   }
+    //   if (unitItemCFV.length) {
+    //     dataForCreateBooking.unitItems = R.call(R.compose(
+    //       R.map(arr => ({
+    //         unitId: arr[0].field.unitId,
+    //         questionAnswers: arr.map(o => ({
+    //           questionId: o.field.id.split('|')[0],
+    //           value: o.value,
+    //         })),
+    //       })),
+    //       R.values,
+    //       R.groupBy(o => {
+    //         const [questionId, unitItemIndex] = o.field.id.split('|');
+    //         return unitItemIndex;
+    //       }),
+    //     ), unitItemCFV);
+    //   }
+    // }
+
+    // TODO: assert validations for equipment
+
+
     const headers = getHeaders({
       apiKey: this.apiKey,
     });
@@ -337,7 +375,7 @@ class Plugin {
     const dataForConfirmBooking = {
       // locales: R.pathOr(null, ['locales'], holder),
       // country: R.pathOr('', ['country'], holder),
-      paymentType: "DEFERRED",
+      paymentType: "Invoice",
       bookingPartnerId: bookingPartnerId,
       bookingRefID: reference,
       sendEmailToPartner: 0,
@@ -350,6 +388,7 @@ class Plugin {
       data: dataForConfirmBooking,
       headers,
     }));
+    // TODO: Call get booking here
     const { products: [product] } = await this.searchProducts({
       axios,
       typeDefsAndQueries,
@@ -362,7 +401,7 @@ class Plugin {
       booking: await translateBooking({
         rootValue: {
           ...booking,
-          product,
+          product,  // this is NOT requied
           // option: product.options.find(o => o.optionId === dataFromAvailKey.optionId),
         },
         typeDefs: bookingTypeDefs,
@@ -520,6 +559,9 @@ class Plugin {
     },
     query: {
       productId,
+      selection,
+      date,
+      dateFormat
     },
   }) {
     const headers = getHeaders({
@@ -530,82 +572,125 @@ class Plugin {
       resellerId,
     });
 
+    console.log("productId : " +  productId); 
+    console.log("date : " +  date); 
+    console.log("dateFormat : " +  dateFormat); 
+    
+    // selection : [{"unitId":"ADULT","quantity":1},{"unitId":"CHILD"},{"unitId":"INFANT"}]
+    let selectedUnits = JSON.parse(selection);
+    // console.log("JSON: " + JSON.stringify(selectedUnits));
+    // console.log("Len: " + selectedUnits);
+    // console.log("Len: " + selectedUnits.length);
+
+    let customFieldsToShow = [];
+
+    // const getEquipmentField = (id, name) => {
+    //   customFieldsToShow.push ({
+    //     id: id,
+    //     title: `${name} Required`,
+    //     subtitle: 'Select the equipment you need',
+    //     type: 'yes-no',
+    //     isPerUnitItem: false,
+    //   })
+    // }
+
+    const getEquipmentCountField = (id, name) => {
+      customFieldsToShow.push ({
+        id: id,
+        title: `Enter ${name} Required`,
+        subtitle: 'Enter the equipment you need',
+        type: 'count',
+        isPerUnitItem: false,
+      })
+    }
+
+    const getAdultEquipmentFields = () => {
+      // getEquipmentField("EBIKE", "e-Bike(s)");
+      getEquipmentCountField("EBIKE_COUNT", "e-Bike(s)");
+    }
+
+    const getChildEquipmentFields = () => {
+      // getEquipmentField("TRAILALONGS", "Trail Alongs(s)");
+      getEquipmentCountField("TRAILALONGS_COUNT", "Trail Alongs(s)");
+      // getEquipmentField("KIDDIECARRIER", "Kiddie Carrier(s)");
+      getEquipmentCountField("KIDDIECARRIER_COUNT", "Kiddie Carrier(s)");
+      // getEquipmentField("SMALLKIDSBIKE", "Small Kids Bike(s)");
+      getEquipmentCountField("SMALLKIDSBIKE_COUNT", "Small Kids Bike(s)");
+      // getEquipmentField("LARGEKIDSBIKE", "Large Kids Bike(s)");
+      getEquipmentCountField("LARGEKIDSBIKE_COUNT", "Large Kids Bike(s)");
+    }
+
+    const getInfantEquipmentFields = () => {
+      // getEquipmentField("BABYSEATS", "Baby Seat(s)");
+      getEquipmentCountField("BABYSEATS_COUNT", "Baby Seat(s)");
+    }
+    
+    selectedUnits.forEach(function (unit, d) {
+      // console.log('%d: %s', i, value);
+      console.log('unit.unitId: ', unit.unitId);
+      console.log('unit.quantity: ', unit.quantity);
+
+      switch (unit.unitId.toString().trim()) {
+        case "ADULT":
+          console.log("inside ADULT loop");
+          getAdultEquipmentFields();
+          break;
+        case "CHILD":
+          console.log("inside CHILD loop");
+          if (unit.quantity == undefined) {
+            return {
+              fields: [],
+              customFields: []
+            };
+          }
+          getChildEquipmentFields();
+          break;
+        case "INFANT":
+        case "FAMILY_INFANT":
+          console.log("inside INFANT loop");
+          if (unit.quantity == undefined) {
+            return {
+              fields: [],
+              customFields: []
+            };
+          }
+          getInfantEquipmentFields();
+          break;
+        case "FAMILY_GROUPS":
+          console.log("inside FAMILY loop");
+          // Family is 2 Adults and 2 Childred
+          getAdultEquipmentFields();
+          getChildEquipmentFields();
+          break;
+      };
+    })
+
+    console.log("customFieldsToShow : " + customFieldsToShow.toString());
+
     return {
       fields: [],
-      customFields: [{
-        id: '4444',
-        title: 'Equipment',
-        subtitle: 'Select the equipment you need',
-        type: 'extended-option',
-        options: [
-          { value: '1', label: 'Helmet' },
-          { value: '2', label: 'Gloves' },
-          { value: '3', label: 'Jacket' },
-        ],
-        isPerUnitItem: true,
-      }],
+      customFields: customFieldsToShow
     }
+    // TODO: Check if we can filter the list based on the UNIT
+    // return {
+    //   fields: [],
+    //   customFields: [{
+    //     id: '4444',
+    //     title: 'Equipment',
+    //     subtitle: 'Select the equipment you need',
+    //     type: 'extended-option',
+    //     options: [
+    //         { value: '1', label: 'e-Bikes (Adult Only)' },
+    //         { value: '2', label: 'Baby Seats (Infants Only)' },
+    //         { value: '3', label: 'Trail Alongs' },
+    //         { value: '4', label: 'Kiddie Carriers' },
+    //         { value: '5', label: 'Small Kids Bikes' },
+    //         { value: '6', label: 'Large Kids Bikes' },
+    //     ],
+    //     isPerUnitItem: true,
+    //   }],
+    // }
   }
-  //   const convertQToField = o => ({
-  //     id: o.id,
-  //     subtitle: o.description === o.label ? '' : o.description,
-  //     title: o.label,
-  //     type: (() => {
-  //       if (o.inputType === 'radio') return 'radio';
-  //       if (Array.isArray(o.selectOptions) && o.selectOptions.length) return 'extended-option';
-  //       if (o.inputType === 'number') return 'count';
-  //       if (o.inputType === 'text') return 'long';
-  //       if (o.inputType === 'textarea') return 'long';
-  //       return 'long';
-  //     })(),
-  //     options: o.selectOptions,
-  //     isPerUnitItem: o.isPerUnitItem,
-  //   });
-  //   if (!productId) {
-  //     const allProducts = R.pathOr([], ['data'], await axios({
-  //       method: 'get',
-  //       url: `${endpoint || this.endpoint}/products`,
-  //       headers,
-  //     }));
-  //     const allOptions = R.chain(R.propOr([], 'options'), allProducts);
-  //     const allUnits = R.chain(R.propOr([], 'units'), allOptions).map(o => ({ ...o, isPerUnitItem: true }));
-  //     const allQuestions = R.call(R.compose(
-  //       R.uniqBy(R.prop('id')),
-  //       R.chain(obj => (obj.questions || []).map(q => ({
-  //         ...q,
-  //         isPerUnitItem: Boolean(obj.isPerUnitItem),
-  //       }))),
-  //       R.filter(o => o.questions && o.questions.length),
-  //     ), [...allOptions, ...allUnits]);
-  //     return {
-  //       fields: [],
-  //       customFields: allQuestions.map(convertQToField),
-  //     };
-  //   }
-  //   const url = `${endpoint || this.endpoint}/products/${productId}`;
-  //   const product = R.pathOr([], ['data'], await axios({
-  //     method: 'get',
-  //     url,
-  //     headers,
-  //   }));
-
-  //   const allOptions = R.propOr([], 'options', product);
-  //   const allQuestions = R.call(R.compose(
-  //     R.uniqBy(R.prop('id')),
-  //     R.chain(obj => (obj.questions || []).map(q => ({
-  //       ...q,
-  //       isPerUnitItem: Boolean(obj.isPerUnitItem),
-  //     }))),
-  //     R.filter(o => o.questions && o.questions.length),
-  //   ), [
-  //     ...allOptions,
-  //     ...R.chain(R.propOr([], 'units'), allOptions).map(o => ({ ...o, isPerUnitItem: true })),
-  //   ]);
-  //   if (!product) return { fields: [] };
-  //   return {
-  //     fields: [],
-  //     customFields: allQuestions.map(convertQToField),
-  //   };
 }
 
 module.exports = Plugin;
