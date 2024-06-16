@@ -28,16 +28,26 @@ const resolvers = {
       return root.cancellable;
     },
     editable: () => false,
-    // TODO: need to have inidividual items in the array
-    // if ADULT = 2 and CHILD = 3, then it hsould ahve 2 items for ADULT in the array
-    // and 3 items for the CHILD in the array
-    unitItems: ({ unitItems = [] }) => unitItems.map(unitItem => ({
-      // TODO:  unitItemId create one here and NEEDS to be unique
-      unitItemId: R.path(['unitId'], unitItem),
-      unitName: R.path(['unitId'], unitItem),
-      // Here we have to show noOfPax!
-      unitId: R.path(['unitId'], unitItem),
-    })),
+    // NOTE: need to have inidividual items in the array
+    unitItems: ({ unitItems = [] }) => {
+        let unitArry = [];
+        unitItems.map(unitItem => {
+          let paxCount = R.path(['noOfPax'], unitItem);
+          console.log("Pax Count: " + paxCount);
+
+          for(var i = 0; i < paxCount; i++) {
+            // If pax for ADULT = 2 and CHILD = 3, then the array should have 2 items for ADULT
+            // and 3 items for the CHILD
+            unitArry. push ({
+              unitItemId: R.path(['unitId'], unitItem),
+              unitId: R.path(['unitId'], unitItem),
+              unitName: R.path(['unitId'], unitItem),
+            })
+          }
+        })
+        return unitArry;
+      },
+
     // start: R.path(['availability', 'localDateTimeStart']),
     start: R.path(['utcCreatedAt']),
     end: R.path(['utcCreatedAt']),
