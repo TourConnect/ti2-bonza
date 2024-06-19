@@ -745,7 +745,7 @@ class Plugin {
     },
     query: {
       productId,
-      selection,
+      unitsSelected,
       date,
       dateFormat
     },
@@ -757,7 +757,7 @@ class Plugin {
       acceptLanguage,
       resellerId,
     });
-    
+
     const getEquipmentCountField = (id, name) => {
       customFieldsToShow.push ({
         id: id,
@@ -789,9 +789,9 @@ class Plugin {
     console.log("dateFormat : " +  dateFormat); 
     
     // EXAMPLE: 
-    // selection : [{"unitId":"ADULT","quantity":1},{"unitId":"CHILD"},{"unitId":"INFANT"}]
-    let selectedUnits = JSON.parse(selection);
-    console.log("Selection: " + JSON.stringify(selectedUnits));
+    // unitsSelected : [{"unitId":"ADULT","quantity":1},{"unitId":"CHILD"},{"unitId":"INFANT"}]
+    let selectedUnits = JSON.parse(unitsSelected);
+    console.log("Selected Units: " + JSON.stringify(selectedUnits));
     console.log("Len: " + selectedUnits.length);
 
     let customFieldsToShow = [];
