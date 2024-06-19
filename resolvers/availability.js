@@ -9,7 +9,7 @@ const resolvers = {
       const {
         productId,
         // unitItems,
-        // optionId,
+        optionId,
         // currency,
         unitsWithQuantity,
         jwtKey,
@@ -18,7 +18,7 @@ const resolvers = {
       if (root.status !== 'AVAILABLE' && root.status !== 'FREESALE') return null;
       return jwt.sign(({
         productId,
-        // optionId,
+        optionId,
         tourDate: R.path(['localDate'], root),
         // currency,
         unitItems: R.chain(u => {

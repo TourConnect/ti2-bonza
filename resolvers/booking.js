@@ -49,8 +49,8 @@ const resolvers = {
       },
 
     // start: R.path(['availability', 'localDateTimeStart']),
-    start: R.path(['utcCreatedAt']),
-    end: R.path(['utcCreatedAt']),
+    start: R.path(['tourDate']),
+    end: R.path(['tourDate']),
     // end: R.path(['availability', 'localDateTimeStart']),
     // allDay: false,
     bookingDate: R.path(['utcCreatedAt']),

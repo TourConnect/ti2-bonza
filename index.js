@@ -1,3 +1,4 @@
+const constants = require('./utils/constants');
 const R = require('ramda');
 const Promise = require('bluebird');
 const assert = require('assert');
@@ -7,6 +8,22 @@ const wildcardMatch = require('./utils/wildcardMatch');
 const { translateProduct } = require('./resolvers/product');
 const { translateAvailability } = require('./resolvers/availability');
 const { translateBooking } = require('./resolvers/booking');
+const EQUIPMENT_COUNT_FIELD_IDS = {
+  EBIKE_COUNT: 1,
+  BABYSEATS_COUNT: 2,
+  TRAILALONGS_COUNT: 3,
+  KIDDIECARRIER_COUNT: 4,
+  SMALLKIDSBIKE_COUNT: 5,
+  LARGEKIDSBIKE_COUNT: 6,
+}
+const EQUIPMENT_FIELD_IDS = {
+  EBIKE: 1001,
+  BABYSEATS: 1002,
+  TRAILALONGS: 1003,
+  KIDDIECARRIER: 1004,
+  SMALLKIDSBIKE: 1005,
+  LARGEKIDSBIKE: 1006,
+}
 
 // const endpoint = 'https://bmsstage.bonzabiketours.com:3001/octo/v1/';
 
@@ -17,7 +34,6 @@ const isNilOrEmpty = R.either(R.isNil, R.isEmpty);
 const getHeaders = ({
   apiKey,
 }) => ({
-  //TODO: REPLACE If Necessary
   Authorization: `Bearer ${apiKey}`,
   'Content-Type': 'application/json',
 });
@@ -28,20 +44,16 @@ class Plugin {
       this[attr] = value;
     });
     this.tokenTemplate = () => ({
-      //TODO: REPLACE If Necessary
-      // In your system apiKey (or whatever token(s) you choose to use) should represent which reseller is sending the requests
-      // and the requests are sent via TourConnect
-      // apiKey: {
-      //   type: 'text',
-      //   regExp: /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/,
-      //   description: 'the Api Key generated from Bonza for a reseller, should be in uuid format',
-      // },
       bookingPartnerId: {
         type: 'text',
         regExp: /^\d+$/,
         description: 'The booking partner id',
       }
     });
+    this.errorPathsAxiosErrors = () => ([ // axios triggered errors
+      ['response', 'data', 'errorMessage'],
+    ]);
+    this.errorPathsAxiosAny = () => ([]); // 200's that should be errors
   }
 
   async validateToken({
@@ -143,6 +155,7 @@ class Plugin {
     // ONLY add payload key when absolutely necessary
     payload: {
       productIds,
+      optionIds,
       startDate,
       endDate,
       dateFormat,
@@ -158,10 +171,10 @@ class Plugin {
       productIds.length === productIds.length,
       'mismatched productIds/options length',
     );
-    // assert(
-    //   optionIds.length === units.length,
-    //   'mismatched options/units length',
-    // );
+    assert(
+      optionIds.length === units.length,
+      'mismatched options/units length',
+    );
     assert(productIds.every(Boolean), 'some invalid productId(s)');
     // assert(optionIds.every(Boolean), 'some invalid optionId(s)');
     console.log("START DATE BEFORE: " + startDate);
@@ -201,7 +214,7 @@ class Plugin {
             rootValue: avail,
             variableValues: {
               productId: productIds[ix],
-              // optionId: optionIds[ix],
+              optionId: optionIds[ix],
               // currency,
               unitsWithQuantity: units[ix],
               jwtKey: this.jwtKey,
@@ -301,9 +314,9 @@ class Plugin {
       holder,
       notes,
       reference,
-      customFieldValues
+      customFieldValues,
       // settlementMethod,
-      // rebookingId : this is for Edit
+      rebookingId
     },
     token,
     typeDefsAndQueries,
@@ -317,47 +330,200 @@ class Plugin {
     assert(R.path(['surname'], holder), 'a holder\' surname is required');
     assert(R.path(['emailAddress'], holder), 'a holder\' email is required');
 
-    if (customFieldValues && customFieldValues.length) {
+    const inputDataForBooking = await jwt.verify(availabilityKey, this.jwtKey);
+    console.log("OPTION ID: " + inputDataForBooking.optionId);
 
+    let isFamilyBooking = false;
+    if (constants.BOOKING_TYPE.FAMILY == inputDataForBooking.optionId) {
+      isFamilyBooking = true;
+    }
+    console.log("Family Booking: " + isFamilyBooking);
+
+    // Get Equipment Details
+    console.log("customFieldValues: " + JSON.stringify(customFieldValues));
+    // Example:
+    // [{"field":{"id":"EBIKE_COUNT","title":"Enter e-Bike(s) Required","subtitle":"Enter the equipment you need",
+    // "type":"count","isPerUnitItem":false},"value":"1"},
+    // {"field":{"id":"TRAILALONGS_COUNT","title":"Enter Trail Alongs(s) Required","subtitle":"Enter the equipment you need",
+    // "type":"count","isPerUnitItem":false},"value":"2"},
+    // {"field":{"id":"KIDDIECARRIER_COUNT","title":"Enter Kiddie Carrier(s) Required","subtitle":"Enter the equipment you need",
+    // "type":"count","isPerUnitItem":false},"value":"3"},
+    // {"field":{"id":"SMALLKIDSBIKE_COUNT","title":"Enter Small Kids Bike(s) Required","subtitle":"Enter the equipment you need",
+    // "type":"count","isPerUnitItem":false},"value":"4"},
+    //{"field":{"id":"LARGEKIDSBIKE_COUNT","title":"Enter Large Kids Bike(s) Required","subtitle":"Enter the equipment you need",
+    //"type":"count","isPerUnitItem":false},"value":"5"},
+    // {"field":{"id":"BABYSEATS_COUNT","title":"Enter Baby Seat(s) Required", "subtitle":"Enter the equipment you need",
+    // "type":"count","isPerUnitItem":false},"value":"6"}]
+    let eBikeCount = 0;
+    let babySeatCount = 0;
+    let kiddieCarrierCount = 0;
+    let trailAlongsCount = 0;
+    let smallKidsBikeCount = 0;
+    let largeKidsBikeCount = 0;
+    let adult_equipment = [];
+    let kid_equipments = [];
+    let infant_equipment = [];
+
+    if (customFieldValues && customFieldValues.length) {
+      console.log("Len: " + customFieldValues.length);
+
+      const unitItemCFV = customFieldValues.filter(o => (!R.isNil(o.value) && (o.value > 0) && !o.field.isPerUnitItem)); 
+      console.log("unitItemCFV: " + JSON.stringify(unitItemCFV));
+
+      unitItemCFV.forEach(function (unit, d) {
+        console.log('unit.field: ', unit.field.title);
+        let count = parseInt(unit.value);
+        console.log('Count : ', count);
+
+        switch(parseInt(unit.field.id)) {
+          case EQUIPMENT_COUNT_FIELD_IDS.EBIKE_COUNT:
+            eBikeCount = count;
+            adult_equipment.push({
+              id : EQUIPMENT_FIELD_IDS.EBIKE,
+              count: count
+            });
+            break;
+          case EQUIPMENT_COUNT_FIELD_IDS.BABYSEATS_COUNT:
+            babySeatCount = count;
+            infant_equipment.push({
+              id : EQUIPMENT_FIELD_IDS.BABYSEATS,
+              count: count
+            });
+            break;
+          case EQUIPMENT_COUNT_FIELD_IDS.KIDDIECARRIER_COUNT:
+            kiddieCarrierCount = count;
+            kid_equipments.push ({
+              id : EQUIPMENT_FIELD_IDS.KIDDIECARRIER,
+              count: count
+            });
+            break;
+          case EQUIPMENT_COUNT_FIELD_IDS.TRAILALONGS_COUNT:
+            trailAlongsCount = count;
+            kid_equipments.push ({
+              id : EQUIPMENT_FIELD_IDS.TRAILALONGS,
+              count: count
+            });
+            break;
+          case EQUIPMENT_COUNT_FIELD_IDS.SMALLKIDSBIKE_COUNT:
+            smallKidsBikeCount = count;
+            kid_equipments.push ({
+              id : EQUIPMENT_FIELD_IDS.SMALLKIDSBIKE,
+              count: count
+            });
+            break;
+          case EQUIPMENT_COUNT_FIELD_IDS.LARGEKIDSBIKE_COUNT:
+            largeKidsBikeCount = count;
+            kid_equipments.push ({
+              id : EQUIPMENT_FIELD_IDS.LARGEKIDSBIKE,
+              count: count
+            });
+            break;
+        }
+      })
     }
 
-    // const dataForCreateBooking = await jwt.verify(availabilityKey, this.jwtKey);
-    // if (customFieldValues && customFieldValues.length) {
-    //   const productCFV = customFieldValues.filter(o => !R.isNil(o.value) && !o.field.isPerUnitItem);
-    //   const unitItemCFV = customFieldValues.filter(o => !R.isNil(o.value) && o.field.isPerUnitItem);
-    //   if (productCFV.length) {
-    //     dataForCreateBooking.questionAnswers = productCFV.map(o => ({
-    //       questionId: o.field.id,
-    //       value: o.value,
-    //     }));
-    //   }
-    //   if (unitItemCFV.length) {
-    //     dataForCreateBooking.unitItems = R.call(R.compose(
-    //       R.map(arr => ({
-    //         unitId: arr[0].field.unitId,
-    //         questionAnswers: arr.map(o => ({
-    //           questionId: o.field.id.split('|')[0],
-    //           value: o.value,
-    //         })),
-    //       })),
-    //       R.values,
-    //       R.groupBy(o => {
-    //         const [questionId, unitItemIndex] = o.field.id.split('|');
-    //         return unitItemIndex;
-    //       }),
-    //     ), unitItemCFV);
-    //   }
-    // }
+    // SAMPLE value of inputDataForBooking
+    console.log("inputDataForBooking: " + JSON.stringify(inputDataForBooking));
+    // {"productId":"11","tourDate":"2024-06-21",
+    console.log("BEFORE UPDATE unitItems : " + JSON.stringify(inputDataForBooking.unitItems));
+    // NOTE: Remember that unitItems return DUPLICATES as shown below. Example:
+    // [{"unitId":"ADULT","noOfPax":1},{"unitId":"CHILD","noOfPax":4},{"unitId":"CHILD","noOfPax":4},
+    // {"unitId":"CHILD","noOfPax":4},{"unitId":"CHILD","noOfPax":4},{"unitId":"INFANT","noOfPax":1}]
 
-    // TODO: assert validations for equipment
+    // Remove duplicates
+    const uniqueUnitItems = inputDataForBooking.unitItems.filter((obj1, i, arr) => 
+      arr.findIndex(obj2 => (obj2.unitId === obj1.unitId)) === i
+    )
+    console.log("uniqueUnitItems : " + JSON.stringify(uniqueUnitItems));
 
+    let noOfAdults = 0;
+    let noOfChildren = 0;
+    let noOfInfants = 0;
+    let noOfAdditionalPax = {};
+    let familyUnit = {};
+    
+    // Get Pax Count and also update family & equipments
+    uniqueUnitItems.map(unitItem => {
+      let paxCount = parseInt(R.path(['noOfPax'], unitItem));
+      let unitId = String(R.path(['unitId'], unitItem));
+    
+      console.log("unitItem: " + JSON.stringify(unitItem));
+      console.log("unitId: " + unitId);
+      console.log("Pax Count: " + paxCount);
+      
+      switch (unitId) {
+        case constants.UNIT_IDS.ADULT:
+          noOfAdults =  paxCount;
+          console.log('adult_equipment : ', adult_equipment);
+          unitItem.equipments = adult_equipment;
+          break;
+        case constants.UNIT_IDS.CHILD:
+          noOfChildren =  paxCount;
+          unitItem.equipments = kid_equipments;
+          break;
+        case constants.UNIT_IDS.INFANT:
+          noOfInfants =  paxCount;
+          unitItem.equipments = infant_equipment;
+          // Family Booking Related
+          noOfAdditionalPax.noOfBabies = paxCount;
+          break;
+        case constants.UNIT_IDS.FAMILY:
+            noOfAdults +=  paxCount * 2;
+            noOfChildren += paxCount * 2;
+            familyUnit.unitId = unitId;
+            familyUnit.noOfPax = paxCount;
+            break;
+        case constants.UNIT_IDS.FAMILY_ADD_ADULT:
+          noOfAdults +=  paxCount;
+          noOfAdditionalPax.noOfAdditionalAdults = paxCount;
+          break;
+        case constants.UNIT_IDS.FAMILY_ADD_CHILD:
+          noOfChildren +=  paxCount;
+          noOfAdditionalPax.noOfAdditionalChildren = paxCount;
+          break;
+      }
+    });
+
+    // Assert validations for equipment
+    if (noOfAdults < eBikeCount) {
+      assert('','e-Bikes are only available for adults at this time. The number of e-bikes you have added to the booking exceed the number of adults in the booking.');
+    }
+    if (noOfInfants < babySeatCount) {
+      assert('',"baby seats are only available for Infants at this time. The number of baby seats you add to the booking can't be more than the number of infants in the booking.");
+    }
+    if (noOfChildren < (kiddieCarrierCount + trailAlongsCount + smallKidsBikeCount + largeKidsBikeCount)) {
+      assert('',"kids equipments are only available for kids at this time. The number of kid equipments you add to the booking can't be more than the number of kids (excluding infants) in the booking.");
+    }
+
+    // Input data validated, including equipment count. proceed to create the booking
+    let dataForBooking = {};
+    dataForBooking.productId = inputDataForBooking.productId;
+    dataForBooking.tourDate = inputDataForBooking.tourDate;
+
+    if (isFamilyBooking) {
+      // add additional pax
+      familyUnit.noOfAdditionalPax = noOfAdditionalPax;
+
+      // add family equipments
+      console.log("adult_equipment : " + JSON.stringify(adult_equipment));
+      console.log("kid_equipments : " + JSON.stringify(kid_equipments));
+      console.log("infant_equipment : " + JSON.stringify(infant_equipment));
+      familyUnit.equipments = adult_equipment.concat(kid_equipments, infant_equipment);
+
+      // add family units
+      console.log("familyUnit : " + JSON.stringify(familyUnit));
+      dataForBooking.unitItems = [familyUnit];
+    } else {
+      dataForBooking.unitItems = uniqueUnitItems;
+    }
+
+    console.log("AFTER UPDATE (data for create booking) : " + JSON.stringify(dataForBooking));
 
     const headers = getHeaders({
       apiKey: this.apiKey,
     });
-    
+  
     const urlForCreateBooking = `${this.endpoint}/bookings`;
-    const dataFromAvailKey = await jwt.verify(availabilityKey, this.jwtKey);
     let booking = R.path(['data'], await axios({
       method: 'post',
       url: urlForCreateBooking,
@@ -367,7 +533,7 @@ class Plugin {
         travelerLastname: `${holder.surname}`,
         email: R.path(['emailAddress'], holder),
         phone: R.pathOr('', ['phone'], holder),
-        ...R.omit(['iat', 'currency'], dataFromAvailKey),
+        ...R.omit(['iat', 'currency'], dataForBooking),
         // notes,
       },
       headers,
@@ -388,21 +554,20 @@ class Plugin {
       data: dataForConfirmBooking,
       headers,
     }));
-    // TODO: Call get booking here
-    const { products: [product] } = await this.searchProducts({
-      axios,
-      typeDefsAndQueries,
-      token,
-      payload: {
-        productId: dataFromAvailKey.productId,
-      }
-    });
+    
+    console.log("booking: " + JSON.stringify(booking));
+
+    // Get the booking
+    let newBooking = R.path(['data'], await axios({
+      method: 'get',
+      url: `${this.endpoint}/bookings/${booking.id}`,
+      data: dataForConfirmBooking,
+      headers,
+    }));
     return ({
       booking: await translateBooking({
         rootValue: {
-          ...booking,
-          product,  // this is NOT requied
-          // option: product.options.find(o => o.optionId === dataFromAvailKey.optionId),
+          ...newBooking,
         },
         typeDefs: bookingTypeDefs,
         query: bookingQuery,
@@ -470,8 +635,11 @@ class Plugin {
     // ONLY add payload key when absolutely necessary
     payload: {
       bookingId,
+      name,
+      purchaseDateStart,
+      purchaseDateEnd,
       travelDateStart,
-      travelDateEnd,
+      travelDateEnd,  
       dateFormat,
     },
     typeDefsAndQueries,
@@ -482,68 +650,86 @@ class Plugin {
     },
   }) {
     assert(
-      !isNilOrEmpty(bookingId)
-      || !(
-        isNilOrEmpty(travelDateStart) && isNilOrEmpty(travelDateEnd) && isNilOrEmpty(dateFormat)
-      ),
-      'at least one parameter is required',
+          !isNilOrEmpty(bookingId)
+      ||  !isNilOrEmpty(name)
+      ||  !(isNilOrEmpty(travelDateStart) && isNilOrEmpty(travelDateEnd) && isNilOrEmpty(dateFormat))
+      ||  !(isNilOrEmpty(purchaseDateStart) && isNilOrEmpty(purchaseDateEnd) && isNilOrEmpty(dateFormat)),
+          'at least one parameter is required',
     );
+
     const headers = getHeaders({
       apiKey: this.apiKey,
     });
-    const searchByUrl = async url => {
-      try {
-        return R.path(['data'], await axios({
-          method: 'get',
-          url,
-          headers,
-        }));
-      } catch (err) {
-        return [];
-      }
-    };
-    const bookings = await (async () => {
-      let url;
+
+    const bookingsFound = await (async () => {
       if (!isNilOrEmpty(bookingId)) {
-        //TODO: REPLACE If Necessary
-        return Promise.all([
-          searchByUrl(`${this.endpoint}/bookings/${bookingId}`),
-          // searchByUrl(`${this.endpoint}/bookings?resellerReference=${bookingId}`),
-          // searchByUrl(`${this.endpoint}/bookings?supplierReference=${bookingId}`),
-        ]);
-      }
-      if (!isNilOrEmpty(travelDateStart)) {
-        const localDateStart = moment(travelDateStart, dateFormat).format('YYYY-MM-DD');
-        const localDateEnd = moment(travelDateEnd, dateFormat).format('YYYY-MM-DD');
-        //TODO: REPLACE If Necessary
-        url = `${this.endpoint}/bookings?tourDateFrom=${encodeURIComponent(localDateStart)}&tourDateTo=${encodeURIComponent(localDateEnd)}`;
-        return R.path(['data'], await axios({
-          method: 'get',
-          url,
-          headers,
+        console.log("BookingID: calling search by URL");
+        let url = `${this.endpoint}/bookings/${bookingId}`;
+        return [R.path(['data'], await axios({
+            method: 'get',
+            url,
+            headers,
+          }))]
+      } else {
+        let url = `${this.endpoint}/bookings?`;
+        let lastNameFilter = false;
+        let travelDateFilter = false;
+        if (!isNilOrEmpty(name)) {
+          console.log("Name: calling search by URL");
+          url += `lastName=${name}`;
+          lastNameFilter = true;
+        }
+        
+        // console.log("travelDateStart: [" + travelDateStart + "]");
+        // console.log("travelDateEnd: [" + travelDateEnd + "]");
+        // console.log("purchaseDateStart: [" + purchaseDateStart + "]");
+        // console.log("purchaseDateEnd: [" + purchaseDateEnd + "]");
+        // console.log("dateFormat: [" + dateFormat + "]");
+
+        if (!(isNilOrEmpty(travelDateStart) && isNilOrEmpty(travelDateEnd)) && !isNilOrEmpty(dateFormat)) {
+          const localDateStart = moment(travelDateStart, dateFormat).format('YYYY-MM-DD');
+          const localDateEnd = moment(travelDateEnd, dateFormat).format('YYYY-MM-DD');
+          console.log("TravelDate: calling search by URL");
+          travelDateFilter = true;
+          if (lastNameFilter && !isNilOrEmpty(localDateStart) && !isNilOrEmpty(localDateEnd)) {
+            url += `&tourDateFrom=${encodeURIComponent(localDateStart)}&tourDateTo=${encodeURIComponent(localDateEnd)}`
+          } else {
+            url += `tourDateFrom=${encodeURIComponent(localDateStart)}&tourDateTo=${encodeURIComponent(localDateEnd)}`;
+          }
+        }
+        
+        if (!(isNilOrEmpty(purchaseDateStart) && isNilOrEmpty(purchaseDateEnd)) && !isNilOrEmpty(dateFormat)) {
+          const localDateStart = moment(purchaseDateStart, dateFormat).format('YYYY-MM-DD');
+          const localDateEnd = moment(purchaseDateEnd, dateFormat).format('YYYY-MM-DD');
+          console.log("PurchaseDate: calling search by URL");
+          if (lastNameFilter || travelDateFilter) {
+            url += `&purchaseDateFrom=${encodeURIComponent(localDateStart)}&purchaseDateTo=${encodeURIComponent(localDateEnd)}`;
+          }
+          else {
+            url += `purchaseDateFrom=${encodeURIComponent(localDateStart)}&purchaseDateTo=${encodeURIComponent(localDateEnd)}`;
+          }
+        }
+        return R.path(['data', 'bookings'], await axios({
+            method: 'get',
+            url,
+            headers,
         }));
       }
-      return [];
     })();
-    return ({
-      bookings: await Promise.map(R.unnest(bookings), async booking => {
-        // const { products: [product] } = await this.searchProducts({
-        //   axios,
-        //   typeDefsAndQueries,
-        //   token,
-        //   payload: {
-        //     productId: booking.productId,
-        //   }
-        // });
-        return translateBooking({
-          rootValue: {
-            ...booking,
-            // product,
-            // option: product.options.find(o => o.optionId === booking.optionId),
-          },
-          typeDefs: bookingTypeDefs,
-          query: bookingQuery,
-        });
+    return (
+      console.log("bookingsFound: " + JSON.stringify(bookingsFound)),
+      {
+      bookings: await Promise.map(bookingsFound, async booking => {
+        console.log("booking raw: " + JSON.stringify(booking));
+          return translateBooking({
+            rootValue: {
+              ...booking,
+              // product,
+              // option: product.options.find(o => o.optionId === booking.optionId),
+            },
+            typeDefs: bookingTypeDefs,
+            query: bookingQuery,
+          });
       })
     });
   }
@@ -571,72 +757,54 @@ class Plugin {
       acceptLanguage,
       resellerId,
     });
-
-    console.log("productId : " +  productId); 
-    console.log("date : " +  date); 
-    console.log("dateFormat : " +  dateFormat); 
     
-    // selection : [{"unitId":"ADULT","quantity":1},{"unitId":"CHILD"},{"unitId":"INFANT"}]
-    let selectedUnits = JSON.parse(selection);
-    // console.log("JSON: " + JSON.stringify(selectedUnits));
-    // console.log("Len: " + selectedUnits);
-    // console.log("Len: " + selectedUnits.length);
-
-    let customFieldsToShow = [];
-
-    // const getEquipmentField = (id, name) => {
-    //   customFieldsToShow.push ({
-    //     id: id,
-    //     title: `${name} Required`,
-    //     subtitle: 'Select the equipment you need',
-    //     type: 'yes-no',
-    //     isPerUnitItem: false,
-    //   })
-    // }
-
     const getEquipmentCountField = (id, name) => {
       customFieldsToShow.push ({
         id: id,
-        title: `Enter ${name} Required`,
-        subtitle: 'Enter the equipment you need',
+        title: `Enter ${name}(s) Required`,
+        subtitle: 'Enter the number of equipment(s) you need',
+        // TODO (Sachin): This has to be an option with max value based on inventory
         type: 'count',
         isPerUnitItem: false,
       })
     }
 
     const getAdultEquipmentFields = () => {
-      // getEquipmentField("EBIKE", "e-Bike(s)");
-      getEquipmentCountField("EBIKE_COUNT", "e-Bike(s)");
+      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.EBIKE_COUNT, constants.LABELS.EBIKE);
     }
 
     const getChildEquipmentFields = () => {
-      // getEquipmentField("TRAILALONGS", "Trail Alongs(s)");
-      getEquipmentCountField("TRAILALONGS_COUNT", "Trail Alongs(s)");
-      // getEquipmentField("KIDDIECARRIER", "Kiddie Carrier(s)");
-      getEquipmentCountField("KIDDIECARRIER_COUNT", "Kiddie Carrier(s)");
-      // getEquipmentField("SMALLKIDSBIKE", "Small Kids Bike(s)");
-      getEquipmentCountField("SMALLKIDSBIKE_COUNT", "Small Kids Bike(s)");
-      // getEquipmentField("LARGEKIDSBIKE", "Large Kids Bike(s)");
-      getEquipmentCountField("LARGEKIDSBIKE_COUNT", "Large Kids Bike(s)");
+      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.TRAILALONGS_COUNT, constants.LABELS.TRAIL_ALONG);
+      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.KIDDIECARRIER_COUNT, constants.LABELS.KIDDIE_CARRIER);
+      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.SMALLKIDSBIKE_COUNT, constants.LABELS.SMALL_KIDS_BIKE);
+      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.LARGEKIDSBIKE_COUNT, constants.LABELS.LARGE_KIDS_BIKE);
     }
 
     const getInfantEquipmentFields = () => {
-      // getEquipmentField("BABYSEATS", "Baby Seat(s)");
-      getEquipmentCountField("BABYSEATS_COUNT", "Baby Seat(s)");
+      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.BABYSEATS_COUNT, constants.LABELS.BABY_SEAT);
     }
+
+    console.log("productId : " +  productId); 
+    console.log("date : " +  date); 
+    console.log("dateFormat : " +  dateFormat); 
+    
+    // EXAMPLE: 
+    // selection : [{"unitId":"ADULT","quantity":1},{"unitId":"CHILD"},{"unitId":"INFANT"}]
+    let selectedUnits = JSON.parse(selection);
+    console.log("Selection: " + JSON.stringify(selectedUnits));
+    console.log("Len: " + selectedUnits.length);
+
+    let customFieldsToShow = [];
     
     selectedUnits.forEach(function (unit, d) {
-      // console.log('%d: %s', i, value);
-      console.log('unit.unitId: ', unit.unitId);
+      console.log('unit.unitId: ', String(unit.unitId));
       console.log('unit.quantity: ', unit.quantity);
 
-      switch (unit.unitId.toString().trim()) {
-        case "ADULT":
-          console.log("inside ADULT loop");
+      switch (String(unit.unitId)) {
+        case constants.UNIT_IDS.ADULT:
           getAdultEquipmentFields();
           break;
-        case "CHILD":
-          console.log("inside CHILD loop");
+        case constants.UNIT_IDS.CHILD:
           if (unit.quantity == undefined) {
             return {
               fields: [],
@@ -645,9 +813,7 @@ class Plugin {
           }
           getChildEquipmentFields();
           break;
-        case "INFANT":
-        case "FAMILY_INFANT":
-          console.log("inside INFANT loop");
+        case constants.UNIT_IDS.INFANT:
           if (unit.quantity == undefined) {
             return {
               fields: [],
@@ -656,8 +822,7 @@ class Plugin {
           }
           getInfantEquipmentFields();
           break;
-        case "FAMILY_GROUPS":
-          console.log("inside FAMILY loop");
+        case constants.UNIT_IDS.FAMILY:
           // Family is 2 Adults and 2 Childred
           getAdultEquipmentFields();
           getChildEquipmentFields();
@@ -671,25 +836,6 @@ class Plugin {
       fields: [],
       customFields: customFieldsToShow
     }
-    // TODO: Check if we can filter the list based on the UNIT
-    // return {
-    //   fields: [],
-    //   customFields: [{
-    //     id: '4444',
-    //     title: 'Equipment',
-    //     subtitle: 'Select the equipment you need',
-    //     type: 'extended-option',
-    //     options: [
-    //         { value: '1', label: 'e-Bikes (Adult Only)' },
-    //         { value: '2', label: 'Baby Seats (Infants Only)' },
-    //         { value: '3', label: 'Trail Alongs' },
-    //         { value: '4', label: 'Kiddie Carriers' },
-    //         { value: '5', label: 'Small Kids Bikes' },
-    //         { value: '6', label: 'Large Kids Bikes' },
-    //     ],
-    //     isPerUnitItem: true,
-    //   }],
-    // }
   }
 }
 

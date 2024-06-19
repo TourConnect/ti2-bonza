@@ -1,6 +1,7 @@
+const constants = require('../utils/constants');
 const { makeExecutableSchema } = require('@graphql-tools/schema');
 const R = require('ramda');
-const { graphql } = require('graphql');
+const { graphql, concatAST } = require('graphql');
 
 const resolvers = {
   Query: {
@@ -14,13 +15,13 @@ const resolvers = {
 
     options: root => [
       {
-        optionId: "1",
-        optionName: 'Non-Family',
+        optionId: constants.BOOKING_TYPE.NON_FAMILY,
+        optionName: constants.LABELS.NON_FAMILY_LABEL,
         // cancellationCutoff: R.pathOr('', ['cancellationCutoff'], root),
         units: root => [
           {
-            unitId: "ADULT",
-            unitName: "Adult",
+            unitId: constants.UNIT_IDS.ADULT,
+            unitName: constants.LABELS.UNIT_ADULT_LABEL,
             // subtitle: R.pathOr('', ['note']),
             type: R.path('', 'type', root),
             pricing: R.path('pricePerUnit'),
@@ -40,8 +41,8 @@ const resolvers = {
             },
           },
           {
-            unitId: "CHILD",
-            unitName: "Child",
+            unitId: constants.UNIT_IDS.CHILD,
+            unitName: constants.LABELS.UNIT_CHILD_LABEL,
             // subtitle: R.pathOr('', ['note']),
             type: R.prop('type'),
             pricing: R.path('pricePerUnit'),
@@ -61,8 +62,8 @@ const resolvers = {
             },
           },
           {
-            unitId: "INFANT",
-            unitName: "Infant",
+            unitId: constants.UNIT_IDS.INFANT,
+            unitName: constants.LABELS.UNIT_INFANT_LABEL,
             // subtitle: R.pathOr('', ['note']),
             type: R.prop('type'),
             pricing: R.path('pricePerUnit'),
@@ -84,12 +85,12 @@ const resolvers = {
         ]
       },
       {
-        optionId: "2",
-        optionName: 'Family',
+        optionId: constants.BOOKING_TYPE.FAMILY,
+        optionName: constants.LABELS.FAMILY_LABEL,
         units: root => [
           {
-            unitId: "FAMILY_GROUPS",
-            unitName: "Family Groups",
+            unitId: constants.UNIT_IDS.FAMILY,
+            unitName: constants.LABELS.UNIT_FAMILY_GROUP_LABEL,
             // subtitle: R.pathOr('', ['note']),
             type: R.prop('type'),
             pricing: R.path('pricePerUnit'),
@@ -109,8 +110,8 @@ const resolvers = {
             },
           },
           {
-            unitId: "ADD_ADULT",
-            unitName: "Additional Adult",
+            unitId: constants.UNIT_IDS.FAMILY_ADD_ADULT,
+            unitName: constants.LABELS.UNIT_FAMILY_GROUP_ADD_ADULT_LABEL,
             // subtitle: R.pathOr('', ['note']),
             type: R.prop('type'),
             pricing: R.path('pricePerUnit'),
@@ -130,8 +131,8 @@ const resolvers = {
             },
           },
           {
-            unitId: "ADD_CHILD",
-            unitName: "Additional Child",
+            unitId: constants.UNIT_IDS.FAMILY_ADD_CHILD,
+            unitName: constants.LABELS.UNIT_FAMILY_GROUP_ADD_CHILD_LABEL,
             // subtitle: R.pathOr('', ['note']),
             type: R.prop('type'),
             pricing: R.path('pricePerUnit'),
@@ -151,8 +152,8 @@ const resolvers = {
             },
           },
           {
-            unitId: "FAMILY_INFANT",
-            unitName: "Infant",
+            unitId: constants.UNIT_IDS.INFANT,
+            unitName: constants.LABELS.UNIT_INFANT_LABEL,
             // subtitle: R.pathOr('', ['note']),
             type: R.prop('type'),
             pricing: R.path('pricePerUnit'),
