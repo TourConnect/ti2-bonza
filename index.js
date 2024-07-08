@@ -157,6 +157,7 @@ class Plugin {
     // ONLY add payload key when absolutely necessary
     payload: {
       productIds,
+      optionIds,
       startDate,
       endDate,
       dateFormat,
@@ -167,66 +168,64 @@ class Plugin {
       availQuery,
     },
   }) {
-    try {
-      assert(this.jwtKey, 'JWT secret should be set');
-      assert(
-        productIds.length === productIds.length,
-        'mismatched productIds/options length',
-      );
-      // assert(
-      //   optionIds.length === units.length,
-      //   'mismatched options/units length',
-      // );
-      assert(productIds.every(Boolean), 'some invalid productId(s)');
-      // assert(optionIds.every(Boolean), 'some invalid optionId(s)');
-      console.log("AC: START DATE BEFORE: " + startDate);
-      let todayDate = moment(new Date(), dateFormat).format('YYYY-MM-DD');
-      startDate = moment(startDate, dateFormat).format('YYYY-MM-DD');
-      console.log("AC: TodayDATE: " + todayDate.toString());
-      console.log("AC: startDate: " + startDate.toString());
-      if (startDate < todayDate) {
-        startDate = todayDate.toString();
-      }
-      console.log("AC: START DATE AFTER: " + startDate);
-  
-      const localDateStart = startDate;
-      const localDateEnd = moment(endDate, dateFormat).format('YYYY-MM-DD');
+    assert(this.jwtKey, 'JWT secret should be set');
+    assert(
+      productIds.length === productIds.length,
+      'mismatched productIds/options length',
+    );
+    assert(
+      optionIds.length === units.length,
+      'mismatched options/units length',
+    );
+    assert(productIds.every(Boolean), 'some invalid productId(s)');
+    // assert(optionIds.every(Boolean), 'some invalid optionId(s)');
+    console.log("START DATE BEFORE: " + startDate);
+    let todayDate = Date.now();
+    if (Date(startDate) < todayDate) {
+      startDate = todayDate.toString();
+    }
+    console.log("START DATE AFTER: " + startDate);
+    const localDateStart = moment(startDate, dateFormat).format('YYYY-MM-DD');
+    const localDateEnd = moment(endDate, dateFormat).format('YYYY-MM-DD');
+    const headers = getHeaders({
+      apiKey: this.apiKey,
+    });
 
-      // console.log("AC: END DATE: " + localDateEnd);
-      const headers = getHeaders({
-        apiKey: this.apiKey,
-      });
-      
-      const url = `${this.endpoint}/availability/calendar`;
-      const availability = (
-        await Promise.map(productIds, async (productId, ix) => {
-          // console.log("PRODUCT ID: " + productId);
-          const data = {
-            productId,
-            // optionId: optionIds[ix],
-            localDateStart,
-            localDateEnd,
-            // units is required here to get the total pricing for the calendar
-            //units: units[ix].map(u => ({ id: u.unitId, quantity: u.quantity })),
-          };
-          const result = await axios({
-            method: 'get',
-            url,
-            data,
-            headers,
-          });
-          return Promise.map(result.data, avail => translateAvailability({
-            rootValue: avail,
+    const url = `${this.endpoint}/availability/calendar`;
+    let availability = (
+      await Promise.map(productIds, async (productId, ix) => {
+        const data = {
+          productId,
+          localDateStart,
+          localDateEnd,
+        };
+        return R.path(['data'], await axios({
+          method: 'get',
+          url,
+          data,
+          headers,
+        }));
+      }, { concurrency: CONCURRENCY })
+    );
+    availability = await Promise.map(availability,
+      (avails, ix) => {
+        return Promise.map(avails,
+          avail => translateAvailability({
             typeDefs: availTypeDefs,
             query: availQuery,
-          }))
-        }, { concurrency: CONCURRENCY })
-      );
-      return { availability };
-    } catch (err) {
-      console.log("ERR: " + err);
-      return false;
-    }
+            rootValue: avail,
+            variableValues: {
+              productId: productIds[ix],
+              optionId: optionIds[ix],
+              // currency,
+              unitsWithQuantity: units[ix],
+              jwtKey: this.jwtKey,
+            },
+          }),
+        );
+      },
+    );
+    return { availability };
   }
 
   async availabilityCalendar({

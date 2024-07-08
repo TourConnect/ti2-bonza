@@ -129,7 +129,7 @@ describe('search tests', () => {
         token,
         typeDefsAndQueries,
         payload: {
-          startDate: moment().add(1, 'months').format(dateFormat),
+          startDate: moment().add(1, 'days').format(dateFormat),
           endDate: moment().add(1, 'months').add(2, 'days').format(dateFormat),
           dateFormat,
           productIds: [
@@ -149,20 +149,23 @@ describe('search tests', () => {
         token,
         typeDefsAndQueries,
         payload: {
-          startDate: moment().add(1, 'months').format(dateFormat),
+          startDate: moment().add(1, 'days').format(dateFormat),
           endDate: moment().add(2, 'months').format(dateFormat),
           dateFormat,
-          productIds: [
-            '11',
-          ],
+          productIds: ['11'],
+          optionIds: ["2"],
+          units: [[
+                    {"unitId":"ADULT","quantity":1}
+                  ]
+                 ]
         },
       });
       expect(retVal).toBeTruthy();
       const { availability } = retVal;
       expect(availability).toHaveLength(1);
       expect(availability[0].length).toBeGreaterThan(0);
-      // availabilityKey = R.path([0, 0, 'key'], availability);
-      // expect(availabilityKey).toBeTruthy();
+      availabilityKey = R.path([0, 0, 'key'], availability);
+      expect(availabilityKey).toBeTruthy();
     });
     let booking;
     const reference = faker.datatype.uuid();
