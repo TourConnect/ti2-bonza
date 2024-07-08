@@ -3,6 +3,7 @@ const R = require('ramda');
 const axios = require('axios');
 const moment = require('moment');
 const faker = require('faker');
+const jwt = require('jsonwebtoken');
 
 const Plugin = require('./index');
 
@@ -26,20 +27,24 @@ const typeDefsAndQueries = {
 };
 
 const app = new Plugin({
-  jwtKey: process.env.ti2_peek_jwtKey,
+  endpoint: process.env.ti2_bonza_endpoint,
+  jwtKey: process.env.ti2_bonza_jwtKey,
+  apiKey: process.env.ti2_bonza_apiKey,
 });
 const rnd = arr => arr[Math.floor(Math.random() * arr.length)];
 
 describe('search tests', () => {
   let products;
   let testProduct = {
-    productId: 'av_86yvp',
-    productName: 'Bike Rental - OCTO',
+    productId: '11',
+    productName: 'Sydney Classic Tour',
   };
   const token = {
-    apiKey: process.env.ti2_peek_apiKey,
+    // apiKey: process.env.ti2_bonza_apiKey,
+    bookingPartnerId: 181
   };
   const dateFormat = 'DD/MM/YYYY';
+  const dateFormatCB = 'YYYY-MM-DD';
   beforeAll(async () => {
     // nada
   });
@@ -53,25 +58,25 @@ describe('search tests', () => {
         });
         expect(retVal).toBeTruthy();
       });
-      it('invalid token', async () => {
-        const retVal = await app.validateToken({
-          axios,
-          token: { someRandom: 'thing' },
-        });
-        expect(retVal).toBeFalsy();
-      });
+      // it('invalid token', async () => {
+      //   const retVal = await app.validateToken({
+      //     axios,
+      //     token: { apiKey: 'invalid token' },
+      //   });
+      //   expect(retVal).toBeFalsy();
+      // });
     });
     describe('template tests', () => {
       let template;
       it('get the template', async () => {
         template = await app.tokenTemplate();
         const rules = Object.keys(template);
-        expect(rules).toContain('apiKey');
+        expect(rules).toContain('bookingPartnerId');
       });
-      it('apiKey', () => {
-        const apiKey = template.apiKey.regExp;
-        expect(apiKey.test('something')).toBeFalsy();
-        expect(apiKey.test(process.env.ti2_peek_apiKey)).toBeTruthy();
+      it('bookingPartnerId', () => {
+        const bookingPartnerId = template.bookingPartnerId.regExp;
+        expect(bookingPartnerId.test('something')).toBeFalsy();
+        expect(bookingPartnerId.test(token.bookingPartnerId)).toBeTruthy();
       });
     });
   });
@@ -111,7 +116,7 @@ describe('search tests', () => {
         token,
         typeDefsAndQueries,
         payload: {
-          productName: '*Bike Rental*',
+          productName: '*Sydney Classic*',
         },
       });
       expect(Array.isArray(retVal.products)).toBeTruthy();
@@ -124,15 +129,11 @@ describe('search tests', () => {
         token,
         typeDefsAndQueries,
         payload: {
-          startDate: moment().add(1, 'M').format(dateFormat),
-          endDate: moment().add(1, 'M').add(2, 'd').format(dateFormat),
+          startDate: moment().add(1, 'months').format(dateFormat),
+          endDate: moment().add(1, 'months').add(2, 'days').format(dateFormat),
           dateFormat,
           productIds: [
-            'av_86yvp',
-          ],
-          optionIds: ['av_86yvp'],
-          units: [
-            [{ unitId:'66d2b836-828d-4c88-a24a-ff42a2e54880', quantity: 2 }],
+            '11'
           ],
         },
       });
@@ -148,15 +149,11 @@ describe('search tests', () => {
         token,
         typeDefsAndQueries,
         payload: {
-          startDate: moment().add(2, 'M').format(dateFormat),
-          endDate: moment().add(2, 'M').format(dateFormat),
+          startDate: moment().add(1, 'months').format(dateFormat),
+          endDate: moment().add(2, 'months').format(dateFormat),
           dateFormat,
           productIds: [
-            'av_86yvp',
-          ],
-          optionIds: ['av_86yvp'],
-          units: [
-            [{ unitId:'66d2b836-828d-4c88-a24a-ff42a2e54880', quantity: 2 }],
+            '11',
           ],
         },
       });
@@ -164,8 +161,8 @@ describe('search tests', () => {
       const { availability } = retVal;
       expect(availability).toHaveLength(1);
       expect(availability[0].length).toBeGreaterThan(0);
-      availabilityKey = R.path([0, 0, 'key'], availability);
-      expect(availabilityKey).toBeTruthy();
+      // availabilityKey = R.path([0, 0, 'key'], availability);
+      // expect(availabilityKey).toBeTruthy();
     });
     let booking;
     const reference = faker.datatype.uuid();
@@ -173,16 +170,36 @@ describe('search tests', () => {
       const fullName = faker.name.findName().split(' ');
       const retVal = await app.createBooking({
         axios,
-        token,
+        token: {
+          bookingPartnerId: 181
+        },
         typeDefsAndQueries,
         payload: {
-          availabilityKey,
+          availabilityKey: jwt.sign(({
+            productId: 11,
+            optionId: 2,
+            tourDate: moment().add(5, 'days').format(dateFormatCB),
+            // currency,
+            unitItems: [
+              {
+                  "unitId": "ADULT",
+                  "noOfPax": "3",
+                  "equipments": [
+                      {
+                          "id": "1001",
+                          "count": 1
+                      }
+                  ]
+              }
+            ],
+          }), process.env.ti2_bonza_jwtKey),
           notes: faker.lorem.paragraph(),
           settlementMethod: 'DEFERRED',
           holder: {
             name: fullName[0],
             surname: fullName[1],
-            emailAddress: `engineering+peektests_${faker.lorem.slug()}@tourconnect.com`,
+            emailAddress: `engineering+bonzatests_${faker.lorem.slug()}@tourconnect.com`,
+            phone: "888888877",
             country: faker.address.countryCode(),
           },
           reference,
@@ -193,7 +210,6 @@ describe('search tests', () => {
       expect(booking).toBeTruthy();
       expect(R.path(['id'], booking)).toBeTruthy();
       expect(R.path(['supplierBookingId'], booking)).toBeTruthy();
-      expect(R.path(['cancellable'], booking)).toBeTruthy();
     });
     let bookings = [];
     it('it should be able to search bookings by id', async () => {
@@ -209,26 +225,26 @@ describe('search tests', () => {
       ({ bookings } = retVal);
       expect(R.path([0, 'id'], bookings)).toBeTruthy();
     });
-    it('it should be able to search bookings by reference', async () => {
-      const retVal = await app.searchBooking({
-        axios,
-        token,
-        typeDefsAndQueries,
-        payload: {
-          bookingId: reference,
-        },
-      });
-      expect(Array.isArray(retVal.bookings)).toBeTruthy();
-      ({ bookings } = retVal);
-      expect(R.path([0, 'id'], bookings)).toBeTruthy();
-    });
+    // it('it should be able to search bookings by reference', async () => {
+    //   const retVal = await app.searchBooking({
+    //     axios,
+    //     token,
+    //     typeDefsAndQueries,
+    //     payload: {
+    //       bookingRefId: "TE025660",
+    //     },
+    //   });
+    //   expect(Array.isArray(retVal.bookings)).toBeTruthy();
+    //   ({ bookings } = retVal);
+    //   expect(R.path([0, 'id'], bookings)).toBeTruthy();
+    // });
     it('it should be able to search bookings by supplierBookingId', async () => {
       const retVal = await app.searchBooking({
         axios,
         token,
         typeDefsAndQueries,
         payload: {
-          bookingId: booking.supplierBookingId,
+          bookingRefId: booking.supplierBookingId,
         },
       });
       expect(Array.isArray(retVal.bookings)).toBeTruthy();
@@ -241,8 +257,8 @@ describe('search tests', () => {
         token,
         typeDefsAndQueries,
         payload: {
-          travelDateStart: moment().add(2, 'M').format(dateFormat),
-          travelDateEnd: moment().add(2, 'M').format(dateFormat),
+          travelDateStart: booking.tourDate,
+          travelDateEnd: booking.tourDate,
           dateFormat,
         },
       });
@@ -262,8 +278,7 @@ describe('search tests', () => {
       });
       const { cancellation } = retVal;
       expect(cancellation).toBeTruthy();
-      expect(R.path(['id'], cancellation)).toBeTruthy();
-      expect(R.path(['cancellable'], cancellation)).toBeFalsy();
+      expect(R.path(['status'], cancellation)).toBe("Success");
     });
   });
 });

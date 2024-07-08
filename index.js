@@ -63,10 +63,12 @@ class Plugin {
     },
     }) 
     {
-    const url = `${this.endpoint}/products`;
-    const headers = getHeaders({
-      apiKey:this.apiKey,
-    });
+      // console.log("API KEY in plugin : " + this.apiKey);
+      // console.log("ENDPOINT in plugin : " + this.endpoint);
+      const url = `${this.endpoint}/products`;
+      const headers = getHeaders({
+        apiKey:this.apiKey,
+      });
     try {
       const suppliers = R.path(['data'], await axios({
         method: 'get',
@@ -155,7 +157,6 @@ class Plugin {
     // ONLY add payload key when absolutely necessary
     payload: {
       productIds,
-      optionIds,
       startDate,
       endDate,
       dateFormat,
@@ -166,64 +167,66 @@ class Plugin {
       availQuery,
     },
   }) {
-    assert(this.jwtKey, 'JWT secret should be set');
-    assert(
-      productIds.length === productIds.length,
-      'mismatched productIds/options length',
-    );
-    assert(
-      optionIds.length === units.length,
-      'mismatched options/units length',
-    );
-    assert(productIds.every(Boolean), 'some invalid productId(s)');
-    // assert(optionIds.every(Boolean), 'some invalid optionId(s)');
-    console.log("START DATE BEFORE: " + startDate);
-    let todayDate = Date.now();
-    if (Date(startDate) < todayDate) {
-      startDate = todayDate.toString();
-    }
-    console.log("START DATE AFTER: " + startDate);
-    const localDateStart = moment(startDate, dateFormat).format('YYYY-MM-DD');
-    const localDateEnd = moment(endDate, dateFormat).format('YYYY-MM-DD');
-    const headers = getHeaders({
-      apiKey: this.apiKey,
-    });
+    try {
+      assert(this.jwtKey, 'JWT secret should be set');
+      assert(
+        productIds.length === productIds.length,
+        'mismatched productIds/options length',
+      );
+      // assert(
+      //   optionIds.length === units.length,
+      //   'mismatched options/units length',
+      // );
+      assert(productIds.every(Boolean), 'some invalid productId(s)');
+      // assert(optionIds.every(Boolean), 'some invalid optionId(s)');
+      console.log("AC: START DATE BEFORE: " + startDate);
+      let todayDate = moment(new Date(), dateFormat).format('YYYY-MM-DD');
+      startDate = moment(startDate, dateFormat).format('YYYY-MM-DD');
+      console.log("AC: TodayDATE: " + todayDate.toString());
+      console.log("AC: startDate: " + startDate.toString());
+      if (startDate < todayDate) {
+        startDate = todayDate.toString();
+      }
+      console.log("AC: START DATE AFTER: " + startDate);
+  
+      const localDateStart = startDate;
+      const localDateEnd = moment(endDate, dateFormat).format('YYYY-MM-DD');
 
-    const url = `${this.endpoint}/availability/calendar`;
-    let availability = (
-      await Promise.map(productIds, async (productId, ix) => {
-        const data = {
-          productId,
-          localDateStart,
-          localDateEnd,
-        };
-        return R.path(['data'], await axios({
-          method: 'get',
-          url,
-          data,
-          headers,
-        }));
-      }, { concurrency: CONCURRENCY })
-    );
-    availability = await Promise.map(availability,
-      (avails, ix) => {
-        return Promise.map(avails,
-          avail => translateAvailability({
+      // console.log("AC: END DATE: " + localDateEnd);
+      const headers = getHeaders({
+        apiKey: this.apiKey,
+      });
+      
+      const url = `${this.endpoint}/availability/calendar`;
+      const availability = (
+        await Promise.map(productIds, async (productId, ix) => {
+          // console.log("PRODUCT ID: " + productId);
+          const data = {
+            productId,
+            // optionId: optionIds[ix],
+            localDateStart,
+            localDateEnd,
+            // units is required here to get the total pricing for the calendar
+            //units: units[ix].map(u => ({ id: u.unitId, quantity: u.quantity })),
+          };
+          const result = await axios({
+            method: 'get',
+            url,
+            data,
+            headers,
+          });
+          return Promise.map(result.data, avail => translateAvailability({
+            rootValue: avail,
             typeDefs: availTypeDefs,
             query: availQuery,
-            rootValue: avail,
-            variableValues: {
-              productId: productIds[ix],
-              optionId: optionIds[ix],
-              // currency,
-              unitsWithQuantity: units[ix],
-              jwtKey: this.jwtKey,
-            },
-          }),
-        );
-      },
-    );
-    return { availability };
+          }))
+        }, { concurrency: CONCURRENCY })
+      );
+      return { availability };
+    } catch (err) {
+      console.log("ERR: " + err);
+      return false;
+    }
   }
 
   async availabilityCalendar({
@@ -268,6 +271,8 @@ class Plugin {
   
       const localDateStart = startDate;
       const localDateEnd = moment(endDate, dateFormat).format('YYYY-MM-DD');
+
+      // console.log("AC: END DATE: " + localDateEnd);
       const headers = getHeaders({
         apiKey: this.apiKey,
       });
@@ -275,6 +280,7 @@ class Plugin {
       const url = `${this.endpoint}/availability/calendar`;
       const availability = (
         await Promise.map(productIds, async (productId, ix) => {
+          // console.log("PRODUCT ID: " + productId);
           const data = {
             productId,
             // optionId: optionIds[ix],
@@ -597,12 +603,10 @@ class Plugin {
     const headers = getHeaders({
       apiKey: this.apiKey,
     });
-    //TODO: CHANGE If Necessary
-    const url = `${this.endpoint}/bookings/${bookingId || id}`;
+    const url = `${this.endpoint}/bookings/${bookingId || id}/cancel`;
     const booking = R.path(['data'], await axios({
-      method: 'delete',
+      method: 'post',
       url,
-      //TODO: CHANGE If Necessary
       data: { reason },
       headers,
     }));
@@ -634,6 +638,7 @@ class Plugin {
     },
     // ONLY add payload key when absolutely necessary
     payload: {
+      bookingRefId,
       bookingId,
       name,
       purchaseDateStart,
@@ -651,6 +656,7 @@ class Plugin {
   }) {
     assert(
           !isNilOrEmpty(bookingId)
+      ||  !isNilOrEmpty(bookingRefId)
       ||  !isNilOrEmpty(name)
       ||  !(isNilOrEmpty(travelDateStart) && isNilOrEmpty(travelDateEnd) && isNilOrEmpty(dateFormat))
       ||  !(isNilOrEmpty(purchaseDateStart) && isNilOrEmpty(purchaseDateEnd) && isNilOrEmpty(dateFormat)),
@@ -670,6 +676,14 @@ class Plugin {
             url,
             headers,
           }))]
+      } else if (!isNilOrEmpty(bookingRefId)) {
+        console.log("BookingRefId: calling search by Booking Ref ID");
+        let url = `${this.endpoint}/bookings?bookingRefId=${bookingRefId}`;
+        return R.path(['data', 'bookings'], await axios({
+          method: 'get',
+          url,
+          headers,
+        }));
       } else {
         let url = `${this.endpoint}/bookings?`;
         let lastNameFilter = false;
