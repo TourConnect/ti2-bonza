@@ -47,5 +47,8 @@
     "jest-environment-node": "27.4",
     "jest-util": "27.4",
     "ti2": "file:../ti2"
+  },
+  "optionalDependencies": {
+    "fsevents": "^2.3.3"
   }
 }
