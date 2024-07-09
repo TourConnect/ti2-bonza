@@ -1,6 +1,6 @@
 {
   "name": "ti2-bonza",
-  "version": "1.0.4",
+  "version": "1.0.0",
   "description": "Bonza's TI2 Plugin",
   "main": "index.js",
   "scripts": {
@@ -47,5 +47,8 @@
     "jest-environment-node": "27.4",
     "jest-util": "27.4",
     "ti2": "file:../ti2"
+  },
+  "optionalDependencies": {
+    "fsevents": "^2.3.3"
   }
 }
