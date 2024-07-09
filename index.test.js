@@ -181,7 +181,7 @@ describe('search tests', () => {
           availabilityKey: jwt.sign(({
             productId: 11,
             optionId: 2,
-            tourDate: moment().add(5, 'days').format(dateFormatCB),
+            tourDate: moment().isoWeekday(5).add(14, 'days').format(dateFormatCB),
             // currency,
             unitItems: [
               {
