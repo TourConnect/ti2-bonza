@@ -27,20 +27,19 @@ const typeDefsAndQueries = {
 };
 
 const app = new Plugin({
-  endpoint: process.env.ti2_bonza_endpoint,
   jwtKey: process.env.ti2_bonza_jwtKey,
-  apiKey: process.env.ti2_bonza_apiKey,
 });
 const rnd = arr => arr[Math.floor(Math.random() * arr.length)];
 
 describe('search tests', () => {
-  let products;
+  // let products;
   let testProduct = {
     productId: '11',
     productName: 'Sydney Classic Tour',
   };
   const token = {
-    // apiKey: process.env.ti2_bonza_apiKey,
+    endpoint: process.env.ti2_bonza_endpoint,
+    apiKey: process.env.ti2_bonza_apiKey,
     bookingPartnerId: 181
   };
   const dateFormat = 'DD/MM/YYYY';
@@ -58,20 +57,32 @@ describe('search tests', () => {
         });
         expect(retVal).toBeTruthy();
       });
-      // it('invalid token', async () => {
-      //   const retVal = await app.validateToken({
-      //     axios,
-      //     token: { apiKey: 'invalid token' },
-      //   });
-      //   expect(retVal).toBeFalsy();
-      // });
+      it('invalid token', async () => {
+        const retVal = await app.validateToken({
+          axios,
+          token: { apiKey: 'invalid token' },
+        });
+        expect(retVal).toBeFalsy();
+      });
     });
     describe('template tests', () => {
       let template;
       it('get the template', async () => {
         template = await app.tokenTemplate();
         const rules = Object.keys(template);
+        expect(rules).toContain('endpoint');
+        expect(rules).toContain('apiKey');
         expect(rules).toContain('bookingPartnerId');
+      });
+      it('endpoint', () => {
+        const endpoint = template.endpoint.regExp;
+        expect(endpoint.test('something')).toBeFalsy();
+        expect(endpoint.test(token.endpoint)).toBeTruthy();
+      });
+      it('apiKey', () => {
+        const apiKey = template.apiKey.regExp;
+        expect(apiKey.test('asfsdf something')).toBeFalsy();
+        expect(apiKey.test(token.apiKey)).toBeTruthy();
       });
       it('bookingPartnerId', () => {
         const bookingPartnerId = template.bookingPartnerId.regExp;
@@ -173,9 +184,7 @@ describe('search tests', () => {
       const fullName = faker.name.findName().split(' ');
       const retVal = await app.createBooking({
         axios,
-        token: {
-          bookingPartnerId: 181
-        },
+        token,
         typeDefsAndQueries,
         payload: {
           availabilityKey: jwt.sign(({
