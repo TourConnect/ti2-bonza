@@ -44,10 +44,21 @@ class Plugin {
       this[attr] = value;
     });
     this.tokenTemplate = () => ({
+      endpoint: {
+        type: 'text',
+        regExp: /^(?!mailto:)(?:(?:http|https|ftp):\/\/)(?:\S+(?::\S*)?@)?(?:(?:(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[0-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]+-?)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]+-?)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))|localhost)(?::\d{2,5})?(?:(\/|\?|#)[^\s]*)?$/i,
+        default: 'https://bmsstage.bonzabiketours.com:3001/octo/v1',
+        description: 'The Bonza API endpoint URL',
+      },
+      apiKey: {
+        type: 'text',
+        regExp: /[0-9a-f]{48}/,
+        description: 'The authentication key for Bonza API endpoint',
+      },
       bookingPartnerId: {
         type: 'text',
         regExp: /^\d+$/,
-        description: 'The booking partner id',
+        description: 'The Bonza booking partner id',
       }
     });
     this.errorPathsAxiosErrors = () => ([ // axios triggered errors
@@ -57,17 +68,20 @@ class Plugin {
   }
 
   async validateToken({
-    axios,
-    token: {
-      bookingPartnerId,
-    },
-    }) 
+      axios,
+      token: {
+        endpoint,
+        apiKey,
+        bookingPartnerId,
+      },
+    })
     {
-      // console.log("API KEY in plugin : " + this.apiKey);
-      // console.log("ENDPOINT in plugin : " + this.endpoint);
-      const url = `${this.endpoint}/products`;
+      // console.log("API KEY in plugin : " + apiKey);
+      // console.log("ENDPOINT in plugin : " + endpoint);
+      // console.log("BOOKIGN PARTNER ID in plugin : " + bookingPartnerId);
+      const url = `${endpoint}/products`;
       const headers = getHeaders({
-        apiKey:this.apiKey,
+        apiKey: apiKey,
       });
     try {
       const suppliers = R.path(['data'], await axios({
@@ -85,15 +99,17 @@ class Plugin {
   async searchProducts({
     axios,
     token: {
+      endpoint,
+      apiKey,
       bookingPartnerId,
-    },
+  },
     payload,
     typeDefsAndQueries: {
       productTypeDefs,
       productQuery,
     },
   }) {
-    let url = `${this.endpoint}/products`;
+    let url = `${endpoint}/products`;
     console.log("URL: " + url);
     if (!isNilOrEmpty(payload)) {
       if (payload.productId) {
@@ -104,7 +120,7 @@ class Plugin {
 
     console.log("URL: " + url);
     const headers = getHeaders({
-      apiKey: this.apiKey,
+      apiKey: apiKey,
     });
     let results = R.pathOr([], ['data'], await axios({
       method: 'get',
@@ -137,21 +153,25 @@ class Plugin {
     return ({ products });
   }
 
-  async searchQuote({
-    token: {
-      bookingPartnerId,
-    },
-    payload: {
-      productIds,
-      optionIds,
-    },
-  }) {
-    return { quote: [] };
-  }
+  // async searchQuote({
+  //   token: {
+  //     endpoint,
+  //     apiKey,
+  //     bookingPartnerId,
+  //   },
+  //   payload: {
+  //     productIds,
+  //     optionIds,
+  //   },
+  // }) {
+  //   return { quote: [] };
+  // }
 
   async searchAvailability({
     axios,
     token: {
+      endpoint,
+      apiKey,
       bookingPartnerId,
     },
     // ONLY add payload key when absolutely necessary
@@ -188,10 +208,10 @@ class Plugin {
     const localDateStart = moment(startDate, dateFormat).format('YYYY-MM-DD');
     const localDateEnd = moment(endDate, dateFormat).format('YYYY-MM-DD');
     const headers = getHeaders({
-      apiKey: this.apiKey,
+      apiKey: apiKey,
     });
 
-    const url = `${this.endpoint}/availability/calendar`;
+    const url = `${endpoint}/availability/calendar`;
     let availability = (
       await Promise.map(productIds, async (productId, ix) => {
         const data = {
@@ -231,6 +251,8 @@ class Plugin {
   async availabilityCalendar({
     axios,
     token: {
+      endpoint,
+      apiKey,
       bookingPartnerId,
     },
     // ONLY add payload key when absolutely necessary
@@ -247,6 +269,8 @@ class Plugin {
     },
   }) {
     try {
+      console.log("availabilityCalendar called");
+
       assert(this.jwtKey, 'JWT secret should be set');
       assert(
         productIds.length === productIds.length,
@@ -273,10 +297,10 @@ class Plugin {
 
       // console.log("AC: END DATE: " + localDateEnd);
       const headers = getHeaders({
-        apiKey: this.apiKey,
+        apiKey: apiKey,
       });
       
-      const url = `${this.endpoint}/availability/calendar`;
+      const url = `${endpoint}/availability/calendar`;
       const availability = (
         await Promise.map(productIds, async (productId, ix) => {
           // console.log("PRODUCT ID: " + productId);
@@ -311,6 +335,8 @@ class Plugin {
   async createBooking({
     axios,
     token: {
+      endpoint,
+      apiKey,
       bookingPartnerId,
     },
     // ONLY add payload key when absolutely necessary
@@ -525,10 +551,10 @@ class Plugin {
     console.log("AFTER UPDATE (data for create booking) : " + JSON.stringify(dataForBooking));
 
     const headers = getHeaders({
-      apiKey: this.apiKey,
+      apiKey: apiKey,
     });
   
-    const urlForCreateBooking = `${this.endpoint}/bookings`;
+    const urlForCreateBooking = `${endpoint}/bookings`;
     let booking = R.path(['data'], await axios({
       method: 'post',
       url: urlForCreateBooking,
@@ -555,7 +581,7 @@ class Plugin {
     };
     booking = R.path(['data'], await axios({
       method: 'post',
-      url: `${this.endpoint}/bookings/${booking.orderUUID}/confirm`,
+      url: `${endpoint}/bookings/${booking.orderUUID}/confirm`,
       data: dataForConfirmBooking,
       headers,
     }));
@@ -565,7 +591,7 @@ class Plugin {
     // Get the booking
     let newBooking = R.path(['data'], await axios({
       method: 'get',
-      url: `${this.endpoint}/bookings/${booking.id}`,
+      url: `${endpoint}/bookings/${booking.id}`,
       data: dataForConfirmBooking,
       headers,
     }));
@@ -583,6 +609,8 @@ class Plugin {
   async cancelBooking({
     axios,
     token: {
+      endpoint,
+      apiKey,
       bookingPartnerId,
     },
     // ONLY add payload key when absolutely necessary
@@ -600,9 +628,9 @@ class Plugin {
   }) {
     assert(!isNilOrEmpty(bookingId) || !isNilOrEmpty(id), 'Invalid booking id');
     const headers = getHeaders({
-      apiKey: this.apiKey,
+      apiKey: apiKey,
     });
-    const url = `${this.endpoint}/bookings/${bookingId || id}/cancel`;
+    const url = `${endpoint}/bookings/${bookingId || id}/cancel`;
     const booking = R.path(['data'], await axios({
       method: 'post',
       url,
@@ -633,6 +661,8 @@ class Plugin {
   async searchBooking({
     axios,
     token: {
+      endpoint,
+      apiKey,
       bookingPartnerId,
     },
     // ONLY add payload key when absolutely necessary
@@ -663,13 +693,13 @@ class Plugin {
     );
 
     const headers = getHeaders({
-      apiKey: this.apiKey,
+      apiKey: apiKey,
     });
 
     const bookingsFound = await (async () => {
       if (!isNilOrEmpty(bookingId)) {
         console.log("BookingID: calling search by URL");
-        let url = `${this.endpoint}/bookings/${bookingId}`;
+        let url = `${endpoint}/bookings/${bookingId}`;
         return [R.path(['data'], await axios({
             method: 'get',
             url,
@@ -677,14 +707,14 @@ class Plugin {
           }))]
       } else if (!isNilOrEmpty(bookingRefId)) {
         console.log("BookingRefId: calling search by Booking Ref ID");
-        let url = `${this.endpoint}/bookings?bookingRefId=${bookingRefId}`;
+        let url = `${endpoint}/bookings?bookingRefId=${bookingRefId}`;
         return R.path(['data', 'bookings'], await axios({
           method: 'get',
           url,
           headers,
         }));
       } else {
-        let url = `${this.endpoint}/bookings?`;
+        let url = `${endpoint}/bookings?`;
         let lastNameFilter = false;
         let travelDateFilter = false;
         if (!isNilOrEmpty(name)) {
@@ -750,8 +780,9 @@ class Plugin {
   async getCreateBookingFields({
     axios,
     token: {
-      apiKey,
       endpoint,
+      apiKey,
+      bookingPartnerId,
       octoEnv,
       acceptLanguage,
       resellerId,
@@ -764,7 +795,7 @@ class Plugin {
     },
   }) {
     const headers = getHeaders({
-      apiKey: this.apiKey,
+      apiKey: apiKey,
       endpoint,
       octoEnv,
       acceptLanguage,
