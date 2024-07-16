@@ -77,7 +77,7 @@ const resolvers = {
     // optionName: ({ option }) => option ? option.internalName : '',
     // resellerReference: R.propOr('', 'id'),
     privateUrl: root => {
-      return `https://bmsstage.bonzabiketours.com/purchases/edit-tour/${root.id}`
+      return `${root.uiEndPoint}purchases/edit-tour/${root.id}`
     },
   },
 };
