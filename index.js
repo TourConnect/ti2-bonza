@@ -25,8 +25,6 @@ const EQUIPMENT_FIELD_IDS = {
   LARGEKIDSBIKE: 1006,
 }
 
-// const endpoint = 'https://bmsstage.bonzabiketours.com:3001/octo/v1/';
-
 const CONCURRENCY = 3; // is this ok ?
 
 const isNilOrEmpty = R.either(R.isNil, R.isEmpty);
@@ -361,6 +359,11 @@ class Plugin {
     assert(R.path(['surname'], holder), 'a holder\' surname is required');
     assert(R.path(['emailAddress'], holder), 'a holder\' email is required');
 
+    let uiEndPoint = "https://bms.bonzabiketours.com/";
+    if (endpoint.includes("bmsstage")) {
+      uiEndPoint = "https://bmsstage.bonzabiketours.com/";
+    }
+
     const inputDataForBooking = await jwt.verify(availabilityKey, this.jwtKey);
     console.log("OPTION ID: " + inputDataForBooking.optionId);
 
@@ -586,8 +589,9 @@ class Plugin {
       headers,
     }));
     
-    console.log("booking: " + JSON.stringify(booking));
+    // console.log("booking: " + JSON.stringify(booking));
 
+    // console.log("uiEndPoint: " + uiEndPoint);
     // Get the booking
     let newBooking = R.path(['data'], await axios({
       method: 'get',
@@ -599,6 +603,7 @@ class Plugin {
       booking: await translateBooking({
         rootValue: {
           ...newBooking,
+          uiEndPoint
         },
         typeDefs: bookingTypeDefs,
         query: bookingQuery,
@@ -696,6 +701,11 @@ class Plugin {
       apiKey: apiKey,
     });
 
+    let uiEndPoint = "https://bms.bonzabiketours.com/";
+    if (endpoint.includes("bmsstage")) {
+      uiEndPoint = "https://bmsstage.bonzabiketours.com/";
+    }
+
     const bookingsFound = await (async () => {
       if (!isNilOrEmpty(bookingId)) {
         console.log("BookingID: calling search by URL");
@@ -767,6 +777,7 @@ class Plugin {
           return translateBooking({
             rootValue: {
               ...booking,
+              uiEndPoint
               // product,
               // option: product.options.find(o => o.optionId === booking.optionId),
             },
