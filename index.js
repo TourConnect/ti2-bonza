@@ -906,7 +906,11 @@ class Plugin {
       subtitle: "Enter the traveler's country of origin",
       type: "extended-option",
       isPerUnitItem: false,
-      options: ORIGIN_COUNTRIES,
+      options: ORIGIN_COUNTRIES.reduce(function(map, obj) {
+        map[value] = obj;
+        map[label] = obj;
+        return map;
+      }, {}),
     })
 
     addCustomField(CUSTOM_FIELD_IDS.TRAVELAGENCY, "Entry Travel Agency", "Enter the travel agency name", "short");
