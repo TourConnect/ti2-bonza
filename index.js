@@ -8,13 +8,16 @@ const wildcardMatch = require('./utils/wildcardMatch');
 const { translateProduct } = require('./resolvers/product');
 const { translateAvailability } = require('./resolvers/availability');
 const { translateBooking } = require('./resolvers/booking');
-const EQUIPMENT_COUNT_FIELD_IDS = {
+const CUSTOM_FIELD_IDS = {
   EBIKE_COUNT: 1,
   BABYSEATS_COUNT: 2,
   TRAILALONGS_COUNT: 3,
   KIDDIECARRIER_COUNT: 4,
   SMALLKIDSBIKE_COUNT: 5,
   LARGEKIDSBIKE_COUNT: 6,
+  ORIGINCOUNTRY: 7,
+  TRAVELAGENCY: 8,
+  FAMILS: 9,
 }
 const EQUIPMENT_FIELD_IDS = {
   EBIKE: 1001,
@@ -376,18 +379,27 @@ class Plugin {
     // Get Equipment Details
     console.log("customFieldValues: " + JSON.stringify(customFieldValues));
     // Example:
-    // [{"field":{"id":"EBIKE_COUNT","title":"Enter e-Bike(s) Required","subtitle":"Enter the equipment you need",
-    // "type":"count","isPerUnitItem":false},"value":"1"},
+    // [
+    // {"field":{"id":7,"title":"Entry Origin Country","subtitle":"Enter the traveler's country of origin",
+    //      "type":"short","isPerUnitItem":false},"value":"USA"},
+    // {"field":{"id":8,"title":"Entry Travel Agency","subtitle":"Enter the travel agency name",
+    //      "type":"short","isPerUnitItem":false},"value":"BONZA PARTNER USA"}
+    // {"field":{"id":9,"title":"Is it Famil?","subtitle":"Entry whether this is a famil booking",
+    //      "type":"yes-no","isPerUnitItem":false},"value":false}
+    // {"field":{"id":"EBIKE_COUNT","title":"Enter e-Bike(s) Required","subtitle":"Enter the equipment you need",
+    //       "type":"count","isPerUnitItem":false},"value":"1"},
     // {"field":{"id":"TRAILALONGS_COUNT","title":"Enter Trail Alongs(s) Required","subtitle":"Enter the equipment you need",
-    // "type":"count","isPerUnitItem":false},"value":"2"},
+    //      "type":"count","isPerUnitItem":false},"value":"2"},
     // {"field":{"id":"KIDDIECARRIER_COUNT","title":"Enter Kiddie Carrier(s) Required","subtitle":"Enter the equipment you need",
-    // "type":"count","isPerUnitItem":false},"value":"3"},
+    //      "type":"count","isPerUnitItem":false},"value":"3"},
     // {"field":{"id":"SMALLKIDSBIKE_COUNT","title":"Enter Small Kids Bike(s) Required","subtitle":"Enter the equipment you need",
-    // "type":"count","isPerUnitItem":false},"value":"4"},
+    //      "type":"count","isPerUnitItem":false},"value":"4"},
     //{"field":{"id":"LARGEKIDSBIKE_COUNT","title":"Enter Large Kids Bike(s) Required","subtitle":"Enter the equipment you need",
-    //"type":"count","isPerUnitItem":false},"value":"5"},
+    //      "type":"count","isPerUnitItem":false},"value":"5"},
     // {"field":{"id":"BABYSEATS_COUNT","title":"Enter Baby Seat(s) Required", "subtitle":"Enter the equipment you need",
-    // "type":"count","isPerUnitItem":false},"value":"6"}]
+    //      "type":"count","isPerUnitItem":false},"value":"6"}
+    // ]
+
     let eBikeCount = 0;
     let babySeatCount = 0;
     let kiddieCarrierCount = 0;
@@ -398,8 +410,28 @@ class Plugin {
     let kid_equipments = [];
     let infant_equipment = [];
 
+    let originCountry = "";
+    let travelAgency = "";
+    let famils = 0;
+
     if (customFieldValues && customFieldValues.length) {
       console.log("Len: " + customFieldValues.length);
+
+      customFieldValues.forEach(function (unit, d) {
+        console.log('unit.value: ', unit.value);
+        switch(parseInt(unit.field.id)) {
+          case CUSTOM_FIELD_IDS.ORIGINCOUNTRY:
+            originCountry = !isNilOrEmpty(unit.value) ? unit.value : "";
+          break;
+          case CUSTOM_FIELD_IDS.TRAVELAGENCY:
+            travelAgency = !isNilOrEmpty(unit.value) ? unit.value : "";
+          break;
+          case CUSTOM_FIELD_IDS.FAMILS:
+            let booleanFamils = !isNilOrEmpty(unit.value) ? unit.value : "";
+            famils = booleanFamils === true ? 1 : 0;
+          break;
+        }
+      })
 
       const unitItemCFV = customFieldValues.filter(o => (!R.isNil(o.value) && (o.value > 0) && !o.field.isPerUnitItem)); 
       console.log("unitItemCFV: " + JSON.stringify(unitItemCFV));
@@ -410,42 +442,42 @@ class Plugin {
         console.log('Count : ', count);
 
         switch(parseInt(unit.field.id)) {
-          case EQUIPMENT_COUNT_FIELD_IDS.EBIKE_COUNT:
+          case CUSTOM_FIELD_IDS.EBIKE_COUNT:
             eBikeCount = count;
             adult_equipment.push({
               id : EQUIPMENT_FIELD_IDS.EBIKE,
               count: count
             });
             break;
-          case EQUIPMENT_COUNT_FIELD_IDS.BABYSEATS_COUNT:
+          case CUSTOM_FIELD_IDS.BABYSEATS_COUNT:
             babySeatCount = count;
             infant_equipment.push({
               id : EQUIPMENT_FIELD_IDS.BABYSEATS,
               count: count
             });
             break;
-          case EQUIPMENT_COUNT_FIELD_IDS.KIDDIECARRIER_COUNT:
+          case CUSTOM_FIELD_IDS.KIDDIECARRIER_COUNT:
             kiddieCarrierCount = count;
             kid_equipments.push ({
               id : EQUIPMENT_FIELD_IDS.KIDDIECARRIER,
               count: count
             });
             break;
-          case EQUIPMENT_COUNT_FIELD_IDS.TRAILALONGS_COUNT:
+          case CUSTOM_FIELD_IDS.TRAILALONGS_COUNT:
             trailAlongsCount = count;
             kid_equipments.push ({
               id : EQUIPMENT_FIELD_IDS.TRAILALONGS,
               count: count
             });
             break;
-          case EQUIPMENT_COUNT_FIELD_IDS.SMALLKIDSBIKE_COUNT:
+          case CUSTOM_FIELD_IDS.SMALLKIDSBIKE_COUNT:
             smallKidsBikeCount = count;
             kid_equipments.push ({
               id : EQUIPMENT_FIELD_IDS.SMALLKIDSBIKE,
               count: count
             });
             break;
-          case EQUIPMENT_COUNT_FIELD_IDS.LARGEKIDSBIKE_COUNT:
+          case CUSTOM_FIELD_IDS.LARGEKIDSBIKE_COUNT:
             largeKidsBikeCount = count;
             kid_equipments.push ({
               id : EQUIPMENT_FIELD_IDS.LARGEKIDSBIKE,
@@ -533,6 +565,9 @@ class Plugin {
     let dataForBooking = {};
     dataForBooking.productId = inputDataForBooking.productId;
     dataForBooking.tourDate = inputDataForBooking.tourDate;
+    dataForBooking.originCountry = originCountry;
+    dataForBooking.travelAgency = travelAgency;
+    dataForBooking.famils = famils;
 
     if (isFamilyBooking) {
       // add additional pax
@@ -813,6 +848,16 @@ class Plugin {
       resellerId,
     });
 
+    const addCustomField = (id, title, subtitle, type) => {
+      customFieldsToShow.push ({
+        id: id,
+        title: title,
+        subtitle: subtitle,
+        type: type,
+        isPerUnitItem: false,
+      })
+    }
+
     const getEquipmentCountField = (id, name) => {
       customFieldsToShow.push ({
         id: id,
@@ -825,18 +870,18 @@ class Plugin {
     }
 
     const getAdultEquipmentFields = () => {
-      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.EBIKE_COUNT, constants.LABELS.EBIKE);
+      getEquipmentCountField(CUSTOM_FIELD_IDS.EBIKE_COUNT, constants.LABELS.EBIKE);
     }
 
     const getChildEquipmentFields = () => {
-      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.TRAILALONGS_COUNT, constants.LABELS.TRAIL_ALONG);
-      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.KIDDIECARRIER_COUNT, constants.LABELS.KIDDIE_CARRIER);
-      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.SMALLKIDSBIKE_COUNT, constants.LABELS.SMALL_KIDS_BIKE);
-      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.LARGEKIDSBIKE_COUNT, constants.LABELS.LARGE_KIDS_BIKE);
+      getEquipmentCountField(CUSTOM_FIELD_IDS.TRAILALONGS_COUNT, constants.LABELS.TRAIL_ALONG);
+      getEquipmentCountField(CUSTOM_FIELD_IDS.KIDDIECARRIER_COUNT, constants.LABELS.KIDDIE_CARRIER);
+      getEquipmentCountField(CUSTOM_FIELD_IDS.SMALLKIDSBIKE_COUNT, constants.LABELS.SMALL_KIDS_BIKE);
+      getEquipmentCountField(CUSTOM_FIELD_IDS.LARGEKIDSBIKE_COUNT, constants.LABELS.LARGE_KIDS_BIKE);
     }
 
     const getInfantEquipmentFields = () => {
-      getEquipmentCountField(EQUIPMENT_COUNT_FIELD_IDS.BABYSEATS_COUNT, constants.LABELS.BABY_SEAT);
+      getEquipmentCountField(CUSTOM_FIELD_IDS.BABYSEATS_COUNT, constants.LABELS.BABY_SEAT);
     }
 
     console.log("productId : " +  productId); 
@@ -850,7 +895,12 @@ class Plugin {
     console.log("Len: " + selectedUnits.length);
 
     let customFieldsToShow = [];
-    
+    // The custom field's type. Supported types: yes-no, short, long, count, and extended-option.
+
+    addCustomField(CUSTOM_FIELD_IDS.ORIGINCOUNTRY, "Entry Origin Country", "Enter the traveler's country of origin", "short");
+    addCustomField(CUSTOM_FIELD_IDS.TRAVELAGENCY, "Entry Travel Agency", "Enter the travel agency name", "short");
+    addCustomField(CUSTOM_FIELD_IDS.FAMILS, "Is it famils booking?", "Entry whether this is a famil booking", "yes-no");
+
     selectedUnits.forEach(function (unit, d) {
       console.log('unit.unitId: ', String(unit.unitId));
       console.log('unit.quantity: ', unit.quantity);
