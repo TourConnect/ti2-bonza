@@ -21,6 +21,8 @@ const CUSTOM_FIELD_IDS = {
   ORIGINCOUNTRY: 7,
   TRAVELAGENCY: 8,
   FAMILS: 9,
+  SEND_EMAIL_TO_PARTNER: 10,
+  SEND_EMAIL_TO_GUEST: 11
 }
 const EQUIPMENT_FIELD_IDS = {
   EBIKE: 1001,
@@ -416,6 +418,8 @@ class Plugin {
     let originCountry = "";
     let travelAgency = "";
     let famils = 0;
+    let sendEmailToPartner = 0;
+    let sendEmailToGuest = 0;
 
     if (customFieldValues && customFieldValues.length) {
       console.log("Len: " + customFieldValues.length);
@@ -424,7 +428,7 @@ class Plugin {
         console.log('unit.value: ', unit.value);
         switch(parseInt(unit.field.id)) {
           case CUSTOM_FIELD_IDS.ORIGINCOUNTRY:
-            originCountry = !isNilOrEmpty(unit.value) ? unit.value : "";
+            originCountry = !isNilOrEmpty(unit.value) ? ORIGIN_COUNTRIES[unit.value] : "";
           break;
           case CUSTOM_FIELD_IDS.TRAVELAGENCY:
             travelAgency = !isNilOrEmpty(unit.value) ? unit.value : "";
@@ -432,6 +436,14 @@ class Plugin {
           case CUSTOM_FIELD_IDS.FAMILS:
             let booleanFamils = !isNilOrEmpty(unit.value) ? unit.value : "";
             famils = booleanFamils === true ? 1 : 0;
+          break;
+          case CUSTOM_FIELD_IDS.SEND_EMAIL_TO_PARTNER:
+            let booleanEmailToPartner = !isNilOrEmpty(unit.value) ? unit.value : "";
+            sendEmailToPartner = booleanEmailToPartner === true ? 1 : 0;
+          break;
+          case CUSTOM_FIELD_IDS.SEND_EMAIL_TO_GUEST:
+            let booleanEmailToGuest = !isNilOrEmpty(unit.value) ? unit.value : "";
+            sendEmailToGuest = booleanEmailToGuest === true ? 1 : 0;
           break;
         }
       })
@@ -616,8 +628,8 @@ class Plugin {
       paymentType: "Invoice",
       bookingPartnerId: bookingPartnerId,
       bookingRefID: reference,
-      sendEmailToPartner: 0,
-      sendEmailToGuest: 1
+      sendEmailToPartner: sendEmailToPartner,
+      sendEmailToGuest: sendEmailToGuest
       // settlementMethod,
     };
     booking = R.path(['data'], await axios({
@@ -900,21 +912,24 @@ class Plugin {
     let customFieldsToShow = [];
     // The custom field's type. Supported types: yes-no, short, long, count, and extended-option.
 
+    let index = 0;
+
     customFieldsToShow.push ({
       id: CUSTOM_FIELD_IDS.ORIGINCOUNTRY,
       title: "Entry Origin Country",
       subtitle: "Enter the traveler's country of origin",
       type: "extended-option",
       isPerUnitItem: false,
-      options: ORIGIN_COUNTRIES.reduce(function(map, obj) {
-        map[value] = obj;
-        map[label] = obj;
-        return map;
-      }, {}),
+      options: ORIGIN_COUNTRIES.map(name => ({
+        value: index++,
+        label: name,
+      })),
     })
 
     addCustomField(CUSTOM_FIELD_IDS.TRAVELAGENCY, "Entry Travel Agency", "Enter the travel agency name", "short");
-    addCustomField(CUSTOM_FIELD_IDS.FAMILS, "Is it famils booking?", "Entry whether this is a famil booking", "yes-no");
+    addCustomField(CUSTOM_FIELD_IDS.FAMILS, "Is this a famil booking?", "Entry whether this is a famil booking", "yes-no");
+    addCustomField(CUSTOM_FIELD_IDS.SEND_EMAIL_TO_PARTNER, "Send confirmation email to partner?", "Entry whether your want to send booking cofirmation email to partner.", "yes-no");
+    addCustomField(CUSTOM_FIELD_IDS.SEND_EMAIL_TO_GUEST, "Send confirmation email to guest?", "Entry whether your want to send booking cofirmation email to guest.", "yes-no");
 
     selectedUnits.forEach(function (unit, d) {
       console.log('unit.unitId: ', String(unit.unitId));
