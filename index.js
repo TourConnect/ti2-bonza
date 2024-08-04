@@ -617,6 +617,7 @@ class Plugin {
         travelerLastname: `${holder.surname}`,
         email: R.path(['emailAddress'], holder),
         phone: R.pathOr('', ['phone'], holder),
+        bookingRefID: reference,
         ...R.omit(['iat', 'currency'], dataForBooking),
         // notes,
       },
