@@ -179,7 +179,7 @@ describe('search tests', () => {
       expect(availabilityKey).toBeTruthy();
     });
     let booking;
-    // const reference = faker.datatype.uuid();
+    const bookingRefId = faker.datatype.uuid();
     it('should be able to create a booking', async () => {
       const fullName = faker.name.findName().split(' ');
       const retVal = await app.createBooking({
