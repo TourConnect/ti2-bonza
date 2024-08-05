@@ -618,6 +618,7 @@ class Plugin {
         email: R.path(['emailAddress'], holder),
         phone: R.pathOr('', ['phone'], holder),
         bookingRefID: reference,
+        bookingPartnerId: bookingPartnerId,
         ...R.omit(['iat', 'currency'], dataForBooking),
         // notes,
       },
