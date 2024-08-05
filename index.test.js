@@ -40,7 +40,7 @@ describe('search tests', () => {
   const token = {
     endpoint: process.env.ti2_bonza_endpoint,
     apiKey: process.env.ti2_bonza_apiKey,
-    bookingPartnerId: 181
+    bookingPartnerId: 181,
   };
   const dateFormat = 'DD/MM/YYYY';
   const dateFormatCB = 'YYYY-MM-DD';
@@ -179,7 +179,7 @@ describe('search tests', () => {
       expect(availabilityKey).toBeTruthy();
     });
     let booking;
-    const reference = faker.datatype.uuid();
+    const bookingRefId = faker.datatype.uuid();
     it('should be able to create a booking', async () => {
       const fullName = faker.name.findName().split(' ');
       const retVal = await app.createBooking({
@@ -214,7 +214,7 @@ describe('search tests', () => {
             phone: "888888877",
             country: faker.address.countryCode(),
           },
-          reference,
+          reference: bookingRefId,
         },
       });
       expect(retVal.booking).toBeTruthy();
