@@ -879,7 +879,7 @@ class Plugin {
       customFieldsToShow.push ({
         id: id,
         title: `Enter ${name}(s) Required`,
-        subtitle: 'Enter the number of equipment(s) you need',
+        subtitle: `Enter the number of ${name}(s) you need`,
         // TODO (Sachin): This has to be an option with max value based on inventory
         type: 'count',
         isPerUnitItem: false,
