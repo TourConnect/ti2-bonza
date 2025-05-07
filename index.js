@@ -225,12 +225,13 @@ class Plugin {
           localDateStart,
           localDateEnd,
         };
-        return R.path(['data'], await axios({
+        const result = R.path(['data'], await axios({
           method: 'get',
           url,
           data,
           headers,
         }));
+        return result && Object.keys(result).length > 0 ? result : [];
       }, { concurrency: CONCURRENCY })
     );
     availability = await Promise.map(availability,
@@ -275,7 +276,6 @@ class Plugin {
     },
   }) {
     try {
-      console.log("availabilityCalendar called");
 
       assert(this.jwtKey, 'JWT secret should be set');
       assert(
@@ -324,11 +324,12 @@ class Plugin {
             data,
             headers,
           });
-          return Promise.map(result.data, avail => translateAvailability({
+          return result.data && Object.keys(result.data).length > 0 
+                ? Promise.map(result.data, avail => translateAvailability({
             rootValue: avail,
             typeDefs: availTypeDefs,
             query: availQuery,
-          }))
+          })) : {};
         }, { concurrency: CONCURRENCY })
       );
       return { availability };
