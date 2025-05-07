@@ -15,8 +15,6 @@ const resolvers = {
         jwtKey,
       } = args;
 
-      console.log("jwtKey : " + jwtKey);
-      console.log("root : " + JSON.stringify(root));
       if (!jwtKey) return null;
       if (root.status !== 'AVAILABLE' && root.status !== 'FREESALE') return null;
       return jwt.sign(({
@@ -65,7 +63,6 @@ const resolvers = {
 };
 
 const translateAvailability = async ({ rootValue, variableValues, typeDefs, query }) => {
-  console.log("translateAvailability called");
   const schema = makeExecutableSchema({
     typeDefs,
     resolvers,
