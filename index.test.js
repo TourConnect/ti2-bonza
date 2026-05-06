@@ -30,6 +30,8 @@ const app = new Plugin({
   jwtKey: process.env.ti2_bonza_jwtKey,
 });
 const rnd = arr => arr[Math.floor(Math.random() * arr.length)];
+const runBonzaIntegrationTests = process.env.RUN_BONZA_INTEGRATION_TESTS === 'true';
+const describeIfBonzaIntegration = runBonzaIntegrationTests ? describe : describe.skip;
 
 describe('search tests', () => {
   // let products;
@@ -48,7 +50,7 @@ describe('search tests', () => {
     // nada
   });
   describe('utilities', () => {
-    describe('validateToken', () => {
+    describeIfBonzaIntegration('validateToken', () => {
       it('valid token', async () => {
         expect(token).toBeTruthy();
         const retVal = await app.validateToken({
@@ -76,13 +78,15 @@ describe('search tests', () => {
       });
       it('endpoint', () => {
         const endpoint = template.endpoint.regExp;
+        const validEndpoint = token.endpoint || 'https://bmsstage.bonzabiketours.com:3001/octo/v1';
         expect(endpoint.test('something')).toBeFalsy();
-        expect(endpoint.test(token.endpoint)).toBeTruthy();
+        expect(endpoint.test(validEndpoint)).toBeTruthy();
       });
       it('apiKey', () => {
         const apiKey = template.apiKey.regExp;
+        const validApiKey = token.apiKey || '0123456789abcdef0123456789abcdef0123456789abcdef';
         expect(apiKey.test('asfsdf something')).toBeFalsy();
-        expect(apiKey.test(token.apiKey)).toBeTruthy();
+        expect(apiKey.test(validApiKey)).toBeTruthy();
       });
       it('bookingPartnerId', () => {
         const bookingPartnerId = template.bookingPartnerId.regExp;
@@ -91,7 +95,112 @@ describe('search tests', () => {
       });
     });
   });
-  describe('booking process', () => {
+  describe('booking payload mapping', () => {
+    it('should return mandatory create booking fields with per-booking flags', async () => {
+      const retVal = await app.getCreateBookingFields({
+        axios,
+        token,
+        query: {
+          productId: '11',
+          unitsSelected: JSON.stringify([{ unitId: 'ADULT', quantity: 1 }]),
+          date: moment().format(dateFormat),
+          dateFormat,
+        },
+      });
+      expect(Array.isArray(retVal.fields)).toBeTruthy();
+      expect(retVal.fields).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: 'reference',
+          required: true,
+          visiblePerBooking: true,
+          requiredPerBooking: true,
+        }),
+        expect.objectContaining({ id: 'firstName', required: true }),
+        expect.objectContaining({ id: 'lastName', required: true }),
+        expect.objectContaining({ id: 'emailAddress', required: true }),
+        expect.objectContaining({ id: 'phoneNumber', required: true }),
+      ]));
+    });
+
+    it('should parse new customFieldValues structure in createBooking', async () => {
+      const localApp = new Plugin({ jwtKey: 'unit-test-jwt-key' });
+      let createBookingPayload;
+      let confirmBookingPayload;
+      const axiosMock = jest.fn(async config => {
+        if (config.method === 'post' && config.url.endsWith('/bookings')) {
+          createBookingPayload = config.data;
+          return { data: { orderUUID: 'order-1' } };
+        }
+        if (config.method === 'post' && config.url.endsWith('/bookings/order-1/confirm')) {
+          confirmBookingPayload = config.data;
+          return { data: { id: 'booking-1' } };
+        }
+        if (config.method === 'get' && config.url.endsWith('/bookings/booking-1')) {
+          return {
+            data: {
+              id: 'booking-1',
+              uuid: 'BOOK-REF-1',
+              bookingRefID: 'BOOK-REF-1',
+              status: 'CONFIRMED',
+              product: { id: '11', internalName: 'Sydney Classic Tour' },
+              travelerFirstname: 'Test',
+              travelerLastname: 'User',
+              email: 'test@example.com',
+              phone: '888888877',
+              totalNet: 100,
+            },
+          };
+        }
+        throw new Error(`Unexpected axios call: ${config.method} ${config.url}`);
+      });
+
+      const availabilityKey = jwt.sign({
+        productId: '11',
+        optionId: '2',
+        tourDate: moment().add(14, 'days').format(dateFormatCB),
+        unitItems: [
+          { unitId: 'ADULT', noOfPax: '2' },
+        ],
+      }, 'unit-test-jwt-key');
+
+      const retVal = await localApp.createBooking({
+        axios: axiosMock,
+        token: {
+          endpoint: 'https://bmsstage.bonzabiketours.com:3001/octo/v1',
+          apiKey: 'api-key',
+          bookingPartnerId: 181,
+        },
+        typeDefsAndQueries,
+        payload: {
+          availabilityKey,
+          holder: {
+            name: 'Test',
+            surname: 'User',
+            emailAddress: 'test@example.com',
+            phone: '888888877',
+          },
+          reference: 'BOOK-REF-1',
+          customFieldValues: [
+            { field: { id: 7, type: 'extended-option', isPerUnitItem: false }, value: { value: 146, label: 'Netherlands', userInput: true } },
+            { field: { id: 8, type: 'short', isPerUnitItem: false }, value: 'TEST' },
+            { field: { id: 9, type: 'yes-no', isPerUnitItem: false }, value: 'no' },
+            { field: { id: 10, type: 'yes-no', isPerUnitItem: false }, value: 'yes' },
+            { field: { id: 11, type: 'yes-no', isPerUnitItem: false }, value: 'yes' },
+            { field: { id: 1, type: 'count', isPerUnitItem: false }, value: '1' },
+          ],
+        },
+      });
+
+      expect(createBookingPayload.originCountry).toBe('Netherlands');
+      expect(createBookingPayload.travelAgency).toBe('TEST');
+      expect(createBookingPayload.famils).toBe(0);
+      expect(confirmBookingPayload.sendEmailToPartner).toBe(1);
+      expect(confirmBookingPayload.sendEmailToGuest).toBe(1);
+      expect(retVal.booking).toBeTruthy();
+      expect(retVal.booking.supplierBookingId).toBe('BOOK-REF-1');
+    });
+  });
+  describeIfBonzaIntegration('booking process', () => {
     it('get for all products, a test product should exist', async () => {
       const retVal = await app.searchProducts({
         axios,

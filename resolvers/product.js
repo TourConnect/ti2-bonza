@@ -3,6 +3,8 @@ const { makeExecutableSchema } = require('@graphql-tools/schema');
 const R = require('ramda');
 const { graphql, concatAST } = require('graphql');
 
+const DEFAULT_CURRENCY = 'AUD';
+
 const resolvers = {
   Query: {
     productId: R.path(['id']),
@@ -11,7 +13,11 @@ const resolvers = {
       const result = R.propOr([], 'availableCurrencies', root);
       return R.uniq(result);
     },
-    //defaultCurrency: 'AUD', //R.path(['defaultCurrency']),
+    defaultCurrency: root =>
+      R.path(['defaultCurrency'], root)
+      || R.path(['pricePerUnit', 0, 'currency'], root)
+      || R.path(['availableCurrencies', 0], root)
+      || DEFAULT_CURRENCY,
 
     options: root => [
       {

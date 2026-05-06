@@ -420,32 +420,54 @@ class Plugin {
 
     if (customFieldValues && customFieldValues.length) {
       // console.log("Len: " + customFieldValues.length);
+      const asBoolean = value => {
+        if (value === true || value === false) return value;
+        if (typeof value === 'string') {
+          const normalized = value.trim().toLowerCase();
+          return normalized === 'yes' || normalized === 'true';
+        }
+        return Boolean(value);
+      };
+      const resolveOriginCountry = value => {
+        if (R.isNil(value) || value === '') return '';
+        if (typeof value === 'object') {
+          if (value.label) return value.label;
+          if (!R.isNil(value.value)) {
+            return ORIGIN_COUNTRIES[value.value] || '';
+          }
+          return '';
+        }
+        return ORIGIN_COUNTRIES[value] || value || '';
+      };
+      const resolveCount = value => {
+        const count = parseInt(value, 10);
+        return Number.isNaN(count) ? 0 : count;
+      };
 
       customFieldValues.forEach(function (unit, d) {
         // console.log('unit.value: ', unit.value);
         switch(parseInt(unit.field.id)) {
           case CUSTOM_FIELD_IDS.ORIGINCOUNTRY:
-            originCountry = !isNilOrEmpty(unit.value) ? ORIGIN_COUNTRIES[unit.value] : "";
+            originCountry = resolveOriginCountry(unit.value);
           break;
           case CUSTOM_FIELD_IDS.TRAVELAGENCY:
             travelAgency = !isNilOrEmpty(unit.value) ? unit.value : "";
           break;
           case CUSTOM_FIELD_IDS.FAMILS:
-            let booleanFamils = !isNilOrEmpty(unit.value) ? unit.value : "";
-            famils = booleanFamils === true ? 1 : 0;
+            famils = asBoolean(unit.value) ? 1 : 0;
           break;
           case CUSTOM_FIELD_IDS.SEND_EMAIL_TO_PARTNER:
-            let booleanEmailToPartner = !isNilOrEmpty(unit.value) ? unit.value : "";
-            sendEmailToPartner = booleanEmailToPartner === true ? 1 : 0;
+            sendEmailToPartner = asBoolean(unit.value) ? 1 : 0;
           break;
           case CUSTOM_FIELD_IDS.SEND_EMAIL_TO_GUEST:
-            let booleanEmailToGuest = !isNilOrEmpty(unit.value) ? unit.value : "";
-            sendEmailToGuest = booleanEmailToGuest === true ? 1 : 0;
+            sendEmailToGuest = asBoolean(unit.value) ? 1 : 0;
           break;
         }
       })
 
-      const unitItemCFV = customFieldValues.filter(o => (!R.isNil(o.value) && (o.value > 0) && !o.field.isPerUnitItem)); 
+      const unitItemCFV = customFieldValues.filter(
+        o => (!o.field.isPerUnitItem && resolveCount(o.value) > 0),
+      );
       // console.log("unitItemCFV: " + JSON.stringify(unitItemCFV));
 
       unitItemCFV.forEach(function (unit, d) {
@@ -862,6 +884,18 @@ class Plugin {
       resellerId,
     });
 
+    const addMandatoryField = (id, title, subtitle = '') => {
+      fieldsToShow.push({
+        id,
+        title,
+        subtitle,
+        type: 'short',
+        required: true,
+        visiblePerBooking: true,
+        requiredPerBooking: true,
+      });
+    };
+
     const addCustomField = (id, title, subtitle, type) => {
       customFieldsToShow.push ({
         id: id,
@@ -908,10 +942,17 @@ class Plugin {
     // console.log("Selected Units: " + JSON.stringify(selectedUnits));
     // console.log("Len: " + selectedUnits.length);
 
+    let fieldsToShow = [];
     let customFieldsToShow = [];
     // The custom field's type. Supported types: yes-no, short, long, count, and extended-option.
 
     let index = 0;
+
+    addMandatoryField('reference', 'Booking Reference', 'Enter the booking reference');
+    addMandatoryField('firstName', 'First Name', 'Enter traveler first name');
+    addMandatoryField('lastName', 'Last Name', 'Enter traveler last name');
+    addMandatoryField('emailAddress', 'Email', 'Enter traveler email address');
+    addMandatoryField('phoneNumber', 'Phone', 'Enter traveler phone number');
 
     customFieldsToShow.push ({
       id: CUSTOM_FIELD_IDS.ORIGINCOUNTRY,
@@ -967,7 +1008,7 @@ class Plugin {
     // console.log("customFieldsToShow : " + customFieldsToShow.toString());
 
     return {
-      fields: [],
+      fields: fieldsToShow,
       customFields: customFieldsToShow
     }
   }
