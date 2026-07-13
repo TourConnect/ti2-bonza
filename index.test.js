@@ -111,14 +111,29 @@ describe('search tests', () => {
       expect(retVal.fields).toEqual(expect.arrayContaining([
         expect.objectContaining({
           id: 'reference',
-          required: true,
+          required: false,
           visiblePerBooking: true,
-          requiredPerBooking: true,
+          requiredPerBooking: false,
         }),
-        expect.objectContaining({ id: 'firstName', required: true }),
+        expect.objectContaining({
+          id: 'firstName',
+          required: false,
+          visiblePerBooking: true,
+          requiredPerBooking: false,
+        }),
         expect.objectContaining({ id: 'lastName', required: true }),
-        expect.objectContaining({ id: 'emailAddress', required: true }),
-        expect.objectContaining({ id: 'phoneNumber', required: true }),
+        expect.objectContaining({
+          id: 'emailAddress',
+          required: false,
+          visiblePerBooking: true,
+          requiredPerBooking: false,
+        }),
+        expect.objectContaining({
+          id: 'phoneNumber',
+          required: false,
+          visiblePerBooking: true,
+          requiredPerBooking: false,
+        }),
       ]));
     });
 
@@ -198,6 +213,134 @@ describe('search tests', () => {
       expect(confirmBookingPayload.sendEmailToGuest).toBe(1);
       expect(retVal.booking).toBeTruthy();
       expect(retVal.booking.supplierBookingId).toBe('BOOK-REF-1');
+    });
+
+    it('should omit email, phone, first name, and reference from payloads when missing', async () => {
+      const localApp = new Plugin({ jwtKey: 'unit-test-jwt-key' });
+      let createBookingPayload;
+      let confirmBookingPayload;
+      const axiosMock = jest.fn(async config => {
+        if (config.method === 'post' && config.url.endsWith('/bookings')) {
+          createBookingPayload = config.data;
+          return { data: { orderUUID: 'order-2' } };
+        }
+        if (config.method === 'post' && config.url.endsWith('/bookings/order-2/confirm')) {
+          confirmBookingPayload = config.data;
+          return { data: { id: 'booking-2' } };
+        }
+        if (config.method === 'get' && config.url.endsWith('/bookings/booking-2')) {
+          return {
+            data: {
+              id: 'booking-2',
+              uuid: 'BOOK-REF-2',
+              bookingRefID: 'BOOK-REF-2',
+              status: 'CONFIRMED',
+              product: { id: '11', internalName: 'Sydney Classic Tour' },
+              travelerFirstname: '',
+              travelerLastname: 'User',
+              email: '',
+              phone: '',
+              totalNet: 100,
+            },
+          };
+        }
+        throw new Error(`Unexpected axios call: ${config.method} ${config.url}`);
+      });
+
+      const availabilityKey = jwt.sign({
+        productId: '11',
+        optionId: '2',
+        tourDate: moment().add(14, 'days').format(dateFormatCB),
+        unitItems: [
+          { unitId: 'ADULT', noOfPax: '1' },
+        ],
+      }, 'unit-test-jwt-key');
+
+      await localApp.createBooking({
+        axios: axiosMock,
+        token: {
+          endpoint: 'https://bmsstage.bonzabiketours.com:3001/octo/v1',
+          apiKey: 'api-key',
+          bookingPartnerId: 181,
+        },
+        typeDefsAndQueries,
+        payload: {
+          availabilityKey,
+          holder: {
+            surname: 'User',
+          },
+          customFieldValues: [
+            { field: { id: 7, type: 'extended-option', isPerUnitItem: false }, value: { value: 146, label: 'Netherlands', userInput: true } },
+            { field: { id: 11, type: 'yes-no', isPerUnitItem: false }, value: 'yes' },
+          ],
+        },
+      });
+
+      expect(createBookingPayload.email).toBeUndefined();
+      expect(createBookingPayload.phone).toBeUndefined();
+      expect(createBookingPayload.travelerFirstname).toBeUndefined();
+      expect(createBookingPayload.bookingRefID).toBeUndefined();
+      expect(confirmBookingPayload.bookingRefID).toBeUndefined();
+      expect(confirmBookingPayload.sendEmailToGuest).toBe(0);
+    });
+
+    it('should send phone from holder.phoneNumber when phone is absent', async () => {
+      const localApp = new Plugin({ jwtKey: 'unit-test-jwt-key' });
+      let createBookingPayload;
+      const axiosMock = jest.fn(async config => {
+        if (config.method === 'post' && config.url.endsWith('/bookings')) {
+          createBookingPayload = config.data;
+          return { data: { orderUUID: 'order-3' } };
+        }
+        if (config.method === 'post' && config.url.endsWith('/bookings/order-3/confirm')) {
+          return { data: { id: 'booking-3' } };
+        }
+        if (config.method === 'get' && config.url.endsWith('/bookings/booking-3')) {
+          return {
+            data: {
+              id: 'booking-3',
+              uuid: 'BOOK-REF-3',
+              bookingRefID: 'BOOK-REF-3',
+              status: 'CONFIRMED',
+              product: { id: '11', internalName: 'Sydney Classic Tour' },
+              travelerLastname: 'User',
+              phone: '888888877',
+              totalNet: 100,
+            },
+          };
+        }
+        throw new Error(`Unexpected axios call: ${config.method} ${config.url}`);
+      });
+
+      const availabilityKey = jwt.sign({
+        productId: '11',
+        optionId: '2',
+        tourDate: moment().add(14, 'days').format(dateFormatCB),
+        unitItems: [{ unitId: 'ADULT', noOfPax: '1' }],
+      }, 'unit-test-jwt-key');
+
+      await localApp.createBooking({
+        axios: axiosMock,
+        token: {
+          endpoint: 'https://bmsstage.bonzabiketours.com:3001/octo/v1',
+          apiKey: 'api-key',
+          bookingPartnerId: 181,
+        },
+        typeDefsAndQueries,
+        payload: {
+          availabilityKey,
+          holder: {
+            surname: 'User',
+            phoneNumber: '888888877',
+          },
+          reference: 'BOOK-REF-3',
+          customFieldValues: [
+            { field: { id: 7, type: 'extended-option', isPerUnitItem: false }, value: { value: 146, label: 'Netherlands', userInput: true } },
+          ],
+        },
+      });
+
+      expect(createBookingPayload.phone).toBe('888888877');
     });
   });
   describeIfBonzaIntegration('booking process', () => {

@@ -360,9 +360,7 @@ class Plugin {
     },
   }) {
     assert(availabilityKey, 'an availability code is required !');
-    assert(R.path(['name'], holder), 'a holder\' first name is required');
     assert(R.path(['surname'], holder), 'a holder\' surname is required');
-    assert(R.path(['emailAddress'], holder), 'a holder\' email is required');
 
     let uiEndPoint = "https://bms.bonzabiketours.com/";
     if (endpoint.includes("bmsstage")) {
@@ -625,6 +623,10 @@ class Plugin {
     const headers = getHeaders({
       apiKey: apiKey,
     });
+
+    const holderEmail = R.pathOr('', ['emailAddress'], holder);
+    const holderPhone = R.pathOr('', ['phone'], holder) || R.pathOr('', ['phoneNumber'], holder);
+    const holderFirstname = R.pathOr('', ['name'], holder);
   
     const urlForCreateBooking = `${endpoint}/bookings`;
     let booking = R.path(['data'], await axios({
@@ -632,11 +634,11 @@ class Plugin {
       url: urlForCreateBooking,
       data: {
         // settlementMethod, 
-        travelerFirstname: `${holder.name}`,
+        ...(isNilOrEmpty(holderFirstname) ? {} : { travelerFirstname: holderFirstname }),
         travelerLastname: `${holder.surname}`,
-        email: R.path(['emailAddress'], holder),
-        phone: R.pathOr('', ['phone'], holder),
-        bookingRefID: reference,
+        ...(isNilOrEmpty(holderEmail) ? {} : { email: holderEmail }),
+        ...(isNilOrEmpty(holderPhone) ? {} : { phone: holderPhone }),
+        ...(isNilOrEmpty(reference) ? {} : { bookingRefID: reference }),
         bookingPartnerId: bookingPartnerId,
         ...R.omit(['iat', 'currency'], dataForBooking),
         // notes,
@@ -648,9 +650,9 @@ class Plugin {
       // country: R.pathOr('', ['country'], holder),
       paymentType: "Invoice",
       bookingPartnerId: bookingPartnerId,
-      bookingRefID: reference,
+      ...(isNilOrEmpty(reference) ? {} : { bookingRefID: reference }),
       sendEmailToPartner: sendEmailToPartner,
-      sendEmailToGuest: sendEmailToGuest
+      sendEmailToGuest: !isNilOrEmpty(holderEmail) && sendEmailToGuest ? 1 : 0,
       // settlementMethod,
     };
     booking = R.path(['data'], await axios({
@@ -896,6 +898,18 @@ class Plugin {
       });
     };
 
+    const addOptionalField = (id, title, subtitle = '') => {
+      fieldsToShow.push({
+        id,
+        title,
+        subtitle,
+        type: 'short',
+        required: false,
+        visiblePerBooking: true,
+        requiredPerBooking: false,
+      });
+    };
+
     const addCustomField = (id, title, subtitle, type) => {
       customFieldsToShow.push ({
         id: id,
@@ -948,11 +962,11 @@ class Plugin {
 
     let index = 0;
 
-    addMandatoryField('reference', 'Booking Reference', 'Enter the booking reference');
-    addMandatoryField('firstName', 'First Name', 'Enter traveler first name');
+    addOptionalField('reference', 'Booking Reference', 'Enter the booking reference');
+    addOptionalField('firstName', 'First Name', 'Enter traveler first name');
     addMandatoryField('lastName', 'Last Name', 'Enter traveler last name');
-    addMandatoryField('emailAddress', 'Email', 'Enter traveler email address');
-    addMandatoryField('phoneNumber', 'Phone', 'Enter traveler phone number');
+    addOptionalField('emailAddress', 'Email', 'Enter traveler email address');
+    addOptionalField('phoneNumber', 'Phone', 'Enter traveler phone number');
 
     customFieldsToShow.push ({
       id: CUSTOM_FIELD_IDS.ORIGINCOUNTRY,
