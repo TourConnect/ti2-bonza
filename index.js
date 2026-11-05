@@ -125,22 +125,43 @@ class Plugin {
     const headers = getHeaders({
       apiKey: apiKey,
     });
-    let results = R.pathOr([], ['data'], await axios({
+    let results = R.path(['data'], await axios({
       method: 'get',
       url,
       headers,
     }));
-    if (!Array.isArray(results)) results = [results];
+    if (payload && payload.productId && results && !Array.isArray(results)) {
+      results = [results];
+    }
+    assert(Array.isArray(results), 'Bonza product catalog did not return an array');
+    const productIds = new Set();
+    results = results.filter((product) => {
+      assert(product && ['string', 'number'].includes(typeof product.id)
+        && (typeof product.id !== 'number' || Number.isFinite(product.id))
+        && String(product.id).trim(), 'Bonza product catalog row did not return an id');
+      const id = String(product.id).trim();
+      if (productIds.has(id)) return false;
+      productIds.add(id);
+      return true;
+    });
     let products = await Promise.map(results, async product => {
       return translateProduct({
-        rootValue: product,
+        rootValue: typeof product.id === 'string'
+          ? { ...product, id: product.id.trim() }
+          : product,
         typeDefs: productTypeDefs,
         query: productQuery,
       });
     });
     // dynamic extra filtering
     if (!isNilOrEmpty(payload)) {
-      const extraFilters = R.omit(['productId'], payload);
+      // Keep control fields aligned with ti2/lib/hasProductSearchSelector.js.
+      const extraFilters = R.omit([
+        'productId', 'forceRefresh', 'requestId', 'backgroundJob', 'cacheOnly',
+        'fullSyncTrigger', 'admissionOverrideReason', 'fullSyncStartedAt',
+        'fullSyncAdmissionToken',
+        'omitServiceCodes', 'pickupPointsRequired', 'credentials', 'scheduledProductSyncEnabled',
+      ], payload);
       if (Object.keys(extraFilters).length > 0) {
         products = products.filter(
           product => Object.entries(extraFilters).every(
